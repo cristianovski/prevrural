@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { 
   ArrowLeft, Save, FileText, Mic, MicOff, UploadCloud, 
-  Plus, Trash2, Paperclip, CheckCircle, Calendar, 
-  AlertTriangle, BookOpen, Scale, Tractor, Users, 
+  Plus, Trash2, Paperclip, CheckCircle, 
+  Scale, Tractor, Users, Pencil, X, Check, // ✅ Novos ícones importados
   ShoppingBag, HelpCircle, LayoutList, ChevronRight
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
-// --- LISTA DE DOCUMENTOS (30 ITENS - MANTIDA INTEGRALMENTE) ---
+// --- LISTA DE DOCUMENTOS (MANTIDA) ---
 const DOCUMENT_OPTIONS = [
   { type: "Autodeclaração do Segurado Especial", law: "Lei 8.213/91, Art. 38-B, § 2º; IN 128/2022, Art. 115", obs: "Principal para períodos anteriores a 2023. Deve ser ratificada por bases governamentais." },
   { type: "Bloco de Notas do Produtor Rural", law: "Lei 8.213/91, Art. 106, V; IN 128/2022, Art. 116, III", obs: "Prova robusta de comercialização e atividade ativa." },
@@ -41,6 +41,34 @@ const DOCUMENT_OPTIONS = [
   { type: "Outros", law: "Súmula 149 STJ", obs: "Qualquer outro documento contemporâneo que indique a lida rural." }
 ];
 
+// --- Componente MicInput (Externo para manter foco) ---
+interface MicInputProps {
+  label: string;
+  name: string;
+  placeholder?: string;
+  textarea?: boolean;
+  value: string;
+  onChange: (e: any) => void;
+  listeningField: string | null;
+  onToggleListening: (name: string) => void;
+}
+
+const MicInput = ({ label, name, placeholder, textarea = false, value, onChange, listeningField, onToggleListening }: MicInputProps) => (
+  <div className="mb-4">
+      <label className="text-xs font-bold text-slate-500 mb-1.5 flex justify-between items-center">
+          {label}
+          <button onClick={() => onToggleListening(name)} className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full transition-all ${listeningField === name ? 'bg-red-500 text-white animate-pulse' : 'text-slate-400 hover:bg-slate-100 hover:text-emerald-600'}`}>
+              {listeningField === name ? <><MicOff size={10}/> Gravando...</> : <><Mic size={10}/> Ditar</>}
+          </button>
+      </label>
+      {textarea ? (
+          <textarea name={name} value={value || ""} onChange={onChange} rows={3} className={`w-full p-3 border rounded-xl text-sm resize-none transition-all outline-none focus:ring-4 focus:ring-emerald-500/10 ${listeningField === name ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500'}`} placeholder={placeholder} />
+      ) : (
+          <input name={name} value={value || ""} onChange={onChange} className={`w-full p-3 border rounded-xl text-sm transition-all outline-none focus:ring-4 focus:ring-emerald-500/10 ${listeningField === name ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500'}`} placeholder={placeholder} />
+      )}
+  </div>
+);
+
 interface RuralInterviewPageProps {
   cliente: any;
   onBack: () => void;
@@ -51,10 +79,14 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
   const [uploading, setUploading] = useState(false);
   const [activeTab, setActiveTab] = useState<'dados' | 'narrativa' | 'docs'>('dados');
   const [listeningField, setListeningField] = useState<string | null>(null);
-  
+
   // Estado da Narrativa e Timeline
   const [historico, setHistorico] = useState("");
   const [timeline, setTimeline] = useState<any[]>([]);
+
+  // Estados de Edição da Timeline (NOVOS)
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editData, setEditData] = useState<any>({});
 
   // Dados Estruturados
   const [ruralData, setRuralData] = useState<any>({
@@ -78,7 +110,7 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
   const [newItem, setNewItem] = useState({
     type: DOCUMENT_OPTIONS[0].type,
     customName: "", 
-    year: "", 
+    issueDate: "", 
     fileUrl: "",
     fileName: ""
   });
@@ -118,7 +150,7 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
     setRuralData({ ...ruralData, [e.target.name]: e.target.value });
   };
 
-  // --- LÓGICA DE DITADO (MANTIDA) ---
+  // --- LÓGICA DE DITADO ---
   const toggleListening = (fieldName: string, isNarrative: boolean = false) => {
     if (listeningField === fieldName) {
         setListeningField(null);
@@ -131,7 +163,7 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
     const recognition = new SpeechRecognition();
     recognition.lang = 'pt-BR';
     recognition.continuous = false;
-    
+
     recognition.onstart = () => setListeningField(fieldName);
     recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
@@ -147,28 +179,49 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
     };
     recognition.onerror = () => setListeningField(null);
     recognition.onend = () => setListeningField(null);
+
     recognition.start();
   };
 
+  // --- UPLOAD COM TRATAMENTO DE NOME ---
   const handleFileUpload = async (e: any) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    if (!cliente || !cliente.id) {
+        alert("Erro: ID do cliente não identificado. Tente recarregar a página.");
+        console.error("Tentativa de upload sem cliente definido:", cliente);
+        return;
+    }
+
     setUploading(true);
     try {
-        const name = file.name || "doc";
-        const fileExt = name.split('.').pop() || "bin";
-        const fileName = `${cliente.id}/${Math.random().toString(36).substring(7)}.${fileExt}`;
+        const fileExt = file.name.split('.').pop();
+        const cleanName = file.name.split('.')[0].replace(/[^a-zA-Z0-9]/g, '_');
+        const timestamp = Date.now();
         
-        const { error: err } = await supabase.storage.from('evidence-files').upload(fileName, file);
+        const fileName = `${cliente.id}/${timestamp}_${cleanName}.${fileExt}`;
+        
+        console.log("Iniciando upload para:", fileName);
+
+        const { error: err } = await supabase.storage
+            .from('evidence-files')
+            .upload(fileName, file, {
+                cacheControl: '3600',
+                upsert: false
+            });
+
         if (err) throw err;
 
-        const { data } = supabase.storage.from('evidence-files').getPublicUrl(fileName);
+        const { data } = supabase.storage
+            .from('evidence-files')
+            .getPublicUrl(fileName);
         
-        setNewItem(prev => ({ ...prev, fileUrl: data.publicUrl, fileName: name }));
-
+        setNewItem(prev => ({ ...prev, fileUrl: data.publicUrl, fileName: file.name }));
+        
     } catch (error: any) {
-        alert("Erro upload: " + error.message);
+        console.error("Erro detalhado:", error);
+        alert("Erro no upload: " + (error.message || "Verifique o console para detalhes"));
     } finally {
         setUploading(false);
     }
@@ -176,25 +229,65 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
 
   const handleAddItem = () => {
     if (!newItem.fileUrl) return alert("Faça o upload do documento primeiro.");
-
+    if (!newItem.issueDate) return alert("Informe a data de expedição do documento.");
+    
     const finalName = newItem.type === 'Outros' ? (newItem.customName || 'Documento') : newItem.type;
-    const yearVal = newItem.year ? parseInt(newItem.year) : 0;
-
+    
     const item = {
         id: Math.random().toString(36).substring(7),
         type: finalName,
-        year: yearVal,
+        issueDate: newItem.issueDate, 
         fileUrl: newItem.fileUrl,
         fileName: newItem.fileName,
         law: selectedDocInfo?.law || ""
     };
 
-    setTimeline(prev => [...prev, item].sort((a, b) => a.year - b.year));
-    setNewItem(prev => ({ ...prev, year: "", fileUrl: "", fileName: "", customName: "" }));
+    setTimeline(prev => [...prev, item].sort((a, b) => new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime()));
+    setNewItem(prev => ({ ...prev, issueDate: "", fileUrl: "", fileName: "", customName: "" }));
   };
 
   const handleRemoveItem = (id: string) => {
     if (confirm("Remover documento?")) setTimeline(prev => prev.filter(i => i.id !== id));
+  };
+
+  // --- NOVAS FUNÇÕES DE EDIÇÃO ---
+  const startEditing = (item: any) => {
+    setEditingId(item.id);
+    
+    // Verifica se o nome atual é um dos tipos padrão ou se é 'Outros'
+    const isStandardType = DOCUMENT_OPTIONS.some(opt => opt.type === item.type);
+    
+    setEditData({
+      id: item.id,
+      type: isStandardType ? item.type : 'Outros',
+      customName: isStandardType ? '' : item.type,
+      issueDate: item.issueDate
+    });
+  };
+
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditData({});
+  };
+
+  const saveEditing = () => {
+    if (!editData.issueDate) return alert("A data é obrigatória.");
+    
+    const finalType = editData.type === 'Outros' ? (editData.customName || 'Documento') : editData.type;
+
+    setTimeline(prev => prev.map(item => {
+      if (item.id === editingId) {
+        return { 
+          ...item, 
+          type: finalType, 
+          issueDate: editData.issueDate 
+        };
+      }
+      return item;
+    }).sort((a, b) => new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime())); // Reordena
+
+    setEditingId(null);
+    setEditData({});
   };
 
   const handleSave = async () => {
@@ -217,22 +310,11 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
     }
   };
 
-  // Helper renderizado com estilo atualizado
-  const MicInput = ({ label, name, placeholder, textarea = false }: any) => (
-      <div className="mb-4">
-          <label className="text-xs font-bold text-slate-500 mb-1.5 flex justify-between items-center">
-              {label}
-              <button onClick={() => toggleListening(name)} className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full transition-all ${listeningField === name ? 'bg-red-500 text-white animate-pulse' : 'text-slate-400 hover:bg-slate-100 hover:text-emerald-600'}`}>
-                   {listeningField === name ? <><MicOff size={10}/> Gravando...</> : <><Mic size={10}/> Ditar</>}
-              </button>
-          </label>
-          {textarea ? (
-              <textarea name={name} value={ruralData[name]} onChange={handleRuralChange} rows={3} className={`w-full p-3 border rounded-xl text-sm resize-none transition-all outline-none focus:ring-4 focus:ring-emerald-500/10 ${listeningField === name ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500'}`} placeholder={placeholder} />
-          ) : (
-              <input name={name} value={ruralData[name]} onChange={handleRuralChange} className={`w-full p-3 border rounded-xl text-sm transition-all outline-none focus:ring-4 focus:ring-emerald-500/10 ${listeningField === name ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500'}`} placeholder={placeholder} />
-          )}
-      </div>
-  );
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "?";
+    const [year, month, day] = dateString.split('-');
+    return `${day}/${month}/${year}`;
+  };
 
   return (
     <div className="flex flex-col h-full bg-slate-50 font-sans">
@@ -257,7 +339,7 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
 
       <div className="flex-1 flex overflow-hidden">
         
-        {/* SIDEBAR DE NAVEGAÇÃO (WIZARD) */}
+        {/* SIDEBAR DE NAVEGAÇÃO */}
         <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col p-6 overflow-y-auto">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6">Etapas da Entrevista</h3>
             <nav className="space-y-2">
@@ -297,11 +379,41 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
                             <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2"><LayoutList size={20} className="text-emerald-500"/> Caracterização do Imóvel</h3>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <MicInput name="nome_imovel" label="Nome do Imóvel / Sítio" placeholder="Ex: Fazenda Boa Esperança"/>
-                                <MicInput name="municipio_uf" label="Município / UF"/>
-                                <MicInput name="itr_nirf" label="ITR / NIRF / CCIR" placeholder="Opcional"/>
+                                <MicInput 
+                                  name="nome_imovel" 
+                                  label="Nome do Imóvel / Sítio" 
+                                  placeholder="Ex: Fazenda Boa Esperança"
+                                  value={ruralData.nome_imovel}
+                                  onChange={handleRuralChange}
+                                  listeningField={listeningField}
+                                  onToggleListening={(name) => toggleListening(name)}
+                                />
+                                <MicInput 
+                                  name="municipio_uf" 
+                                  label="Município / UF"
+                                  value={ruralData.municipio_uf}
+                                  onChange={handleRuralChange}
+                                  listeningField={listeningField}
+                                  onToggleListening={(name) => toggleListening(name)}
+                                />
+                                <MicInput 
+                                  name="itr_nirf" 
+                                  label="ITR / NIRF / CCIR" 
+                                  placeholder="Opcional"
+                                  value={ruralData.itr_nirf}
+                                  onChange={handleRuralChange}
+                                  listeningField={listeningField}
+                                  onToggleListening={(name) => toggleListening(name)}
+                                />
                                 <div className="grid grid-cols-2 gap-4">
-                                    <MicInput name="area_total" label="Área Total (Ha)"/>
+                                    <MicInput 
+                                      name="area_total" 
+                                      label="Área Total (Ha)"
+                                      value={ruralData.area_total}
+                                      onChange={handleRuralChange}
+                                      listeningField={listeningField}
+                                      onToggleListening={(name) => toggleListening(name)}
+                                    />
                                     <div>
                                         <label className="text-xs font-bold text-slate-500 mb-1.5 block">Condição de Posse</label>
                                         <div className="relative">
@@ -319,13 +431,28 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
                                 </div>
                             </div>
 
-                            {/* CONDICIONAL: SE NÃO FOR PROPRIETÁRIO */}
                             {!['proprietario', 'posseiro'].includes(ruralData.condicao_posse) && (
                                 <div className="mt-4 p-5 bg-amber-50 rounded-2xl border border-amber-100 animate-in fade-in">
                                     <h4 className="font-bold text-amber-800 text-sm mb-4 flex items-center gap-2"><Users size={16}/> Dados do Proprietário da Terra (Outorgante)</h4>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        <MicInput name="outorgante_nome" label="Nome do Dono" placeholder="Nome Completo"/>
-                                        <MicInput name="outorgante_cpf" label="CPF do Dono" placeholder="000.000.000-00"/>
+                                        <MicInput 
+                                          name="outorgante_nome" 
+                                          label="Nome do Dono" 
+                                          placeholder="Nome Completo"
+                                          value={ruralData.outorgante_nome}
+                                          onChange={handleRuralChange}
+                                          listeningField={listeningField}
+                                          onToggleListening={(name) => toggleListening(name)}
+                                        />
+                                        <MicInput 
+                                          name="outorgante_cpf" 
+                                          label="CPF do Dono" 
+                                          placeholder="000.000.000-00"
+                                          value={ruralData.outorgante_cpf}
+                                          onChange={handleRuralChange}
+                                          listeningField={listeningField}
+                                          onToggleListening={(name) => toggleListening(name)}
+                                        />
                                     </div>
                                 </div>
                             )}
@@ -335,11 +462,37 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
                             <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2"><ShoppingBag size={20} className="text-emerald-500"/> Produção & Família</h3>
                             
                             <div className="space-y-4">
-                                <MicInput name="culturas" label="O que produz/cria?" placeholder="Ex: Milho, Feijão, Mandioca, Galinhas..." textarea/>
-                                <MicInput name="grupo_familiar" label="Grupo Familiar (Quem ajuda?)" placeholder="Nome dos filhos, esposa, parentes..." textarea/>
+                                <MicInput 
+                                  name="culturas" 
+                                  label="O que produz/cria?" 
+                                  placeholder="Ex: Milho, Feijão, Mandioca, Galinhas..." 
+                                  textarea
+                                  value={ruralData.culturas}
+                                  onChange={handleRuralChange}
+                                  listeningField={listeningField}
+                                  onToggleListening={(name) => toggleListening(name)}
+                                />
+                                <MicInput 
+                                  name="grupo_familiar" 
+                                  label="Grupo Familiar (Quem ajuda?)" 
+                                  placeholder="Nome dos filhos, esposa, parentes..." 
+                                  textarea
+                                  value={ruralData.grupo_familiar}
+                                  onChange={handleRuralChange}
+                                  listeningField={listeningField}
+                                  onToggleListening={(name) => toggleListening(name)}
+                                />
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                                    <MicInput name="locais_venda" label="Onde vende a produção?" placeholder="Ex: Feira, Cooperativa, Consumo Próprio"/>
+                                    <MicInput 
+                                      name="locais_venda" 
+                                      label="Onde vende a produção?" 
+                                      placeholder="Ex: Feira, Cooperativa, Consumo Próprio"
+                                      value={ruralData.locais_venda}
+                                      onChange={handleRuralChange}
+                                      listeningField={listeningField}
+                                      onToggleListening={(name) => toggleListening(name)}
+                                    />
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label className="text-xs font-bold text-slate-500 mb-1.5 block">Tem Empregados?</label>
@@ -353,7 +506,17 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
                                             </div>
                                         </div>
                                         {ruralData.tem_empregados !== 'nao' && (
-                                            <div className="animate-in fade-in"><MicInput name="tempo_empregados" label="Tempo?" placeholder="Dias/ano"/></div>
+                                            <div className="animate-in fade-in">
+                                              <MicInput 
+                                                name="tempo_empregados" 
+                                                label="Tempo?" 
+                                                placeholder="Dias/ano"
+                                                value={ruralData.tempo_empregados}
+                                                onChange={handleRuralChange}
+                                                listeningField={listeningField}
+                                                onToggleListening={(name) => toggleListening(name)}
+                                              />
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -431,8 +594,13 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
                                 )}
 
                                 <div className="md:col-span-2">
-                                    <label className="text-xs font-bold text-slate-500 mb-1.5 block">Ano</label>
-                                    <input type="number" placeholder="2024" className="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 outline-none focus:border-emerald-500 text-center font-bold text-slate-700" value={newItem.year} onChange={e => setNewItem({...newItem, year: e.target.value})}/>
+                                    <label className="text-xs font-bold text-slate-500 mb-1.5 block">Data de Expedição</label>
+                                    <input 
+                                        type="date" 
+                                        className="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 outline-none focus:border-emerald-500 text-center font-bold text-slate-700" 
+                                        value={newItem.issueDate} 
+                                        onChange={e => setNewItem({...newItem, issueDate: e.target.value})}
+                                    />
                                 </div>
 
                                 <div className="md:col-span-4">
@@ -470,27 +638,86 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
                                     <p className="text-slate-500 font-medium">Nenhum documento adicionado.</p>
                                 </div>
                             )}
-                            {timeline.map((item, idx) => (
-                                <div key={item.id || idx} className="bg-white p-4 pr-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-5 hover:border-emerald-200 hover:shadow-md transition-all group">
-                                    <div className="w-16 h-16 bg-slate-50 rounded-xl flex flex-col items-center justify-center border border-slate-100 group-hover:bg-emerald-50 group-hover:text-emerald-700 transition-colors">
-                                        <span className="text-[10px] uppercase font-bold text-slate-400 mb-0.5">Ano</span>
-                                        <span className="text-lg font-black text-slate-700">{item.year || "?"}</span>
-                                    </div>
-                                    
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="font-bold text-slate-800 text-sm truncate">{item.type}</h4>
-                                        {item.fileName && (
-                                            <a href={item.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-600 hover:underline mt-1 transition-colors">
-                                                <Paperclip size={12}/> {item.fileName}
-                                            </a>
-                                        )}
-                                    </div>
+                            
+                            {/* --- MAPA DA LISTA COM MODO EDIÇÃO --- */}
+                            {timeline.map((item, idx) => {
+                                const isEditing = editingId === item.id;
 
-                                    <button onClick={() => handleRemoveItem(item.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
-                                        <Trash2 size={20}/>
-                                    </button>
-                                </div>
-                            ))}
+                                return (
+                                    <div key={item.id || idx} className={`p-4 pr-6 rounded-2xl border shadow-sm flex items-center gap-5 transition-all ${isEditing ? 'bg-amber-50 border-amber-200 ring-2 ring-amber-100' : 'bg-white border-slate-100 hover:border-emerald-200 hover:shadow-md group'}`}>
+                                        
+                                        {/* DATA (OU INPUT DE DATA SE EDITANDO) */}
+                                        <div className={`w-24 h-16 rounded-xl flex flex-col items-center justify-center border transition-colors ${isEditing ? 'bg-white border-amber-200' : 'bg-slate-50 border-slate-100 group-hover:bg-emerald-50 group-hover:text-emerald-700'}`}>
+                                            <span className="text-[9px] uppercase font-bold text-slate-400 mb-0.5">Expedição</span>
+                                            {isEditing ? (
+                                                <input 
+                                                    type="date" 
+                                                    className="w-full h-full bg-transparent text-center text-xs font-bold outline-none text-slate-700" 
+                                                    value={editData.issueDate} 
+                                                    onChange={e => setEditData({...editData, issueDate: e.target.value})}
+                                                />
+                                            ) : (
+                                                <span className="text-sm font-black text-slate-700">{formatDate(item.issueDate)}</span>
+                                            )}
+                                        </div>
+                                        
+                                        {/* TIPO E ARQUIVO (OU INPUTS SE EDITANDO) */}
+                                        <div className="flex-1 min-w-0">
+                                            {isEditing ? (
+                                                <div className="space-y-2">
+                                                    <select 
+                                                        className="w-full text-sm border-b border-amber-300 bg-transparent py-1 font-bold text-slate-700 outline-none"
+                                                        value={editData.type}
+                                                        onChange={e => setEditData({...editData, type: e.target.value})}
+                                                    >
+                                                        {DOCUMENT_OPTIONS.map((opt, i) => <option key={i} value={opt.type}>{opt.type}</option>)}
+                                                    </select>
+                                                    {editData.type === 'Outros' && (
+                                                        <input 
+                                                            className="w-full text-sm border-b border-amber-300 bg-transparent py-1 text-slate-600 outline-none"
+                                                            placeholder="Nome do documento..."
+                                                            value={editData.customName}
+                                                            onChange={e => setEditData({...editData, customName: e.target.value})}
+                                                        />
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <>
+                                                    <h4 className="font-bold text-slate-800 text-sm truncate">{item.type}</h4>
+                                                    {item.fileName && (
+                                                        <a href={item.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-600 hover:underline mt-1 transition-colors">
+                                                            <Paperclip size={12}/> {item.fileName}
+                                                        </a>
+                                                    )}
+                                                </>
+                                            )}
+                                        </div>
+
+                                        {/* AÇÕES: EDITAR / SALVAR / EXCLUIR */}
+                                        <div className="flex items-center gap-2">
+                                            {isEditing ? (
+                                                <>
+                                                    <button onClick={saveEditing} className="p-2 bg-emerald-100 text-emerald-600 hover:bg-emerald-200 rounded-xl transition-all" title="Salvar">
+                                                        <Check size={18}/>
+                                                    </button>
+                                                    <button onClick={cancelEditing} className="p-2 bg-slate-100 text-slate-400 hover:bg-slate-200 rounded-xl transition-all" title="Cancelar">
+                                                        <X size={18}/>
+                                                    </button>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <button onClick={() => startEditing(item)} className="p-2 text-slate-300 hover:text-blue-500 hover:bg-blue-50 rounded-xl transition-all" title="Editar">
+                                                        <Pencil size={18}/>
+                                                    </button>
+                                                    <button onClick={() => handleRemoveItem(item.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all" title="Excluir">
+                                                        <Trash2 size={18}/>
+                                                    </button>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })}
                         </div>
                     </div>
                 )}

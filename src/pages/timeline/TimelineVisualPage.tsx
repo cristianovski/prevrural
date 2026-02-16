@@ -1,12 +1,12 @@
 import { useState, useEffect } from "react";
 import { 
-  ArrowLeft, Calendar, Printer, Scale, 
-  Plus, Trash2, Wand2, Save, ExternalLink, Eye,
+  ArrowLeft, Printer, Scale, 
+  Plus, Trash2, Wand2, Save, Eye,
   Lock, LockOpen, ArrowRight, ArrowLeft as ArrowLeftIcon
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
-// --- BASE DE DADOS JURÍDICA ---
+// --- BASE DE DADOS JURÍDICA (MANTIDA) ---
 const DOCUMENT_OPTIONS = [
   { type: "Autodeclaração do Segurado Especial", law: "Lei 8.213/91, Art. 38-B, § 2º; IN 128/2022, Art. 115" },
   { type: "Bloco de Notas do Produtor Rural", law: "Lei 8.213/91, Art. 106, V; IN 128/2022, Art. 116, III" },
@@ -136,16 +136,20 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
   };
 
   const handleAddItem = (docBase: any) => {
+    // ✅ CORREÇÃO: Obtém a data do novo campo issueDate ou fallback para o year antigo
+    const baseDate = docBase.issueDate || `${docBase.year}-01-01`;
+    const baseYear = baseDate.split('-')[0];
+
     const newItem = {
         id: Math.random().toString(36).substr(2, 9),
         nome: docBase.type, 
         tipo: 'Rural', 
         fundamento: getLegalBasis(docBase.type), 
-        dataExpedicao: `${docBase.year}-01-01`, 
-        periodoInicio: `${docBase.year}-01-01`,
-        periodoFim: `${docBase.year}-12-31`,
+        dataExpedicao: baseDate, 
+        periodoInicio: baseDate,
+        periodoFim: `${baseYear}-12-31`,
         fileUrl: docBase.fileUrl,
-        anchor: 'start' // 'start' (trava inicio) ou 'end' (trava fim)
+        anchor: 'start'
     };
     setSelectedItems([...selectedItems, newItem]);
   };
@@ -162,24 +166,21 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
     setSelectedItems(newItems);
   };
 
-  // --- NOVA LÓGICA DE TRAVA E CÁLCULO ---
   const toggleAnchor = (idx: number, newAnchor: 'start' | 'end') => {
       updateItem(idx, 'anchor', newAnchor);
   };
 
   const applyMagicPeriod = (idx: number) => {
     const item = selectedItems[idx];
-    const anchor = item.anchor || 'start'; // Padrão é travar início
+    const anchor = item.anchor || 'start'; 
 
     if (anchor === 'start') {
-        // Trava INÍCIO -> Calcula FIM (Início + 90 meses)
         if (!item.periodoInicio) return alert("Defina a Data de Início primeiro.");
         const start = new Date(item.periodoInicio);
         const end = new Date(start);
         end.setMonth(end.getMonth() + 90);
         updateItem(idx, 'periodoFim', end.toISOString().split('T')[0]);
     } else {
-        // Trava FIM -> Calcula INÍCIO (Fim - 90 meses)
         if (!item.periodoFim) return alert("Defina a Data Final primeiro.");
         const end = new Date(item.periodoFim);
         const start = new Date(end);
@@ -231,6 +232,12 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
     if (!dateStr) return "";
     const [ano, mes, dia] = dateStr.split('-');
     return `${dia}/${mes}/${ano}`;
+  };
+
+  // Helper para exibir ano na sidebar
+  const getYearFromDoc = (doc: any) => {
+      if (doc.issueDate) return doc.issueDate.split('-')[0];
+      return doc.year || "?";
   };
 
   const renderRuler = () => {
@@ -302,7 +309,8 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
                      <select id="docSelect" className="flex-1 p-3 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500/20">
                         <option value="">Selecione da lista...</option>
                         {availableDocs.map((doc, i) => (
-                            <option key={i} value={i}>{doc.year} - {doc.type}</option>
+                            // ✅ CORREÇÃO: Mostra o ano extraído da issueDate
+                            <option key={i} value={i}>{getYearFromDoc(doc)} - {doc.type}</option>
                         ))}
                      </select>
                      <button 
@@ -327,7 +335,6 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
                 {selectedItems.map((item, idx) => (
                     <div key={idx} className="p-4 rounded-xl bg-white border border-slate-200 text-sm relative group hover:border-emerald-400 hover:shadow-md transition-all">
                         
-                        {/* AÇÕES DE CABEÇALHO DO ITEM */}
                         <div className="absolute top-3 right-3 flex gap-2">
                             {item.fileUrl && (
                                 <a 
@@ -355,17 +362,14 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
                                 <div className="flex justify-between items-center mb-2">
                                     <label className="text-[10px] font-bold text-emerald-800 block uppercase">Período de Eficácia</label>
                                     
-                                    {/* BOTÃO MÁGICO DE CÁLCULO */}
                                     <button onClick={() => applyMagicPeriod(idx)} className="text-[10px] bg-emerald-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-emerald-700 font-bold shadow-sm transition-all active:scale-95 border border-emerald-700">
                                         <Wand2 size={10}/> 
                                         {item.anchor === 'end' ? 'Projetar Início (-90m)' : 'Projetar Fim (+90m)'}
                                     </button>
                                 </div>
 
-                                {/* CONTROLE DE DATAS COM TRAVA */}
                                 <div className="flex items-center gap-2 mb-2">
                                     
-                                    {/* INPUT DE INÍCIO */}
                                     <div className="flex-1 relative">
                                         <input 
                                             type="date" 
@@ -384,7 +388,6 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
 
                                     <span className="text-slate-400 text-[10px]"><ArrowRight size={12}/></span>
                                     
-                                    {/* INPUT DE FIM */}
                                     <div className="flex-1 relative">
                                         <input 
                                             type="date" 
@@ -415,11 +418,10 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
 
         </aside>
 
-        {/* --- PAINEL DIREITO: GRÁFICO (O que é impresso) --- */}
+        {/* --- PAINEL DIREITO: GRÁFICO --- */}
         <main className="flex-1 p-8 md:p-12 overflow-x-auto bg-slate-50 print:bg-white print:p-0 print:overflow-visible">
             <div className="min-w-[800px] max-w-5xl mx-auto bg-white p-10 rounded-[1rem] shadow-sm border border-slate-200 print:shadow-none print:border-0 print:p-0 scale-95 origin-top">
                 
-                {/* CABEÇALHO DO RELATÓRIO */}
                 <div className="mb-10 border-b-2 border-slate-800 pb-6 flex justify-between items-end">
                     <div>
                         <h2 className="text-2xl font-serif font-black text-slate-900 uppercase tracking-widest mb-2">Quadro Probatório</h2>
@@ -430,7 +432,6 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
                     </div>
                     
                     <div className="flex flex-col items-end gap-3">
-                         {/* --- NOVO: SOMA DOS PERÍODOS --- */}
                         <div className="bg-emerald-50 border border-emerald-100 px-4 py-2 rounded-lg text-right print:bg-transparent print:border-none print:p-0">
                             <div className="text-[10px] font-bold text-emerald-700 uppercase mb-0.5 print:text-slate-500">Soma dos Períodos</div>
                             <div className="text-xl font-black text-emerald-900 print:text-slate-900">{totalMesesCount} meses</div>
@@ -445,15 +446,12 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
                     </div>
                 </div>
 
-                {/* --- O GRÁFICO --- */}
                 <div className="relative pt-6 pb-12 break-inside-avoid">
                     
-                    {/* Linhas de Grade */}
                     <div className="absolute inset-0 flex pointer-events-none opacity-20">
                         {renderRuler().map((_, i) => <div key={i} className="flex-1 border-r border-slate-300"></div>)}
                     </div>
 
-                    {/* Barras */}
                     <div className="space-y-6 relative z-10 min-h-[200px]">
                         {selectedItems.length === 0 && (
                             <div className="absolute inset-0 flex items-center justify-center text-slate-300 text-sm italic print:hidden">
@@ -488,13 +486,11 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
                         })}
                     </div>
 
-                    {/* Régua de Tempo */}
                     <div className="relative h-8 mt-6 border-t border-slate-400">
                         {renderRuler()}
                     </div>
                 </div>
 
-                {/* --- LEGENDA E DETALHAMENTO --- */}
                 {selectedItems.length > 0 && (
                 <div className="mt-12">
                     <h3 className="text-sm font-bold text-slate-800 uppercase tracking-widest border-b border-slate-200 pb-2 mb-6">Detalhamento dos Instrumentos</h3>
@@ -521,7 +517,6 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
                 </div>
                 )}
 
-                {/* --- LEGENDAS DE CORES --- */}
                 <div className="mt-10 pt-6 border-t border-slate-200 flex flex-wrap justify-center gap-6 text-xs print:mt-6 break-inside-avoid">
                     <div className="flex items-center gap-2"><div className="w-4 h-4 bg-emerald-500 rounded border border-emerald-600"></div><span className="font-bold text-slate-700">Período Rural</span></div>
                     <div className="flex items-center gap-2"><div className="w-4 h-4 bg-slate-200 rounded border border-slate-400"></div><span className="font-bold text-slate-700">Urbano / Outros</span></div>

@@ -31,11 +31,11 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
       if (error) throw error;
 
       if (data && Array.isArray(data.timeline_json)) {
-        // Ordena por ano (do mais antigo para o mais novo)
+        // ✅ CORREÇÃO: Ordena pela data completa (issueDate) ou pelo ano antigo
         const sorted = data.timeline_json.sort((a: any, b: any) => {
-            const yearA = parseInt(a.year) || 0;
-            const yearB = parseInt(b.year) || 0;
-            return yearA - yearB;
+            const dateA = new Date(a.issueDate || `${a.year}-01-01`).getTime();
+            const dateB = new Date(b.issueDate || `${b.year}-01-01`).getTime();
+            return dateA - dateB;
         });
         setTimeline(sorted);
       }
@@ -46,19 +46,25 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
     }
   };
 
-  // Filtra os itens
+  // Função auxiliar para extrair o ANO da data
+  const getYearDisplay = (item: any) => {
+      if (item.issueDate) return item.issueDate.split('-')[0]; // Pega "2024" de "2024-05-20"
+      if (item.year) return item.year;
+      return "?";
+  };
+
   const filteredItems = timeline.filter(item => {
     const search = filter.toLowerCase();
     const type = (item.type || "").toLowerCase();
     const name = (item.customName || "").toLowerCase();
     const fileName = (item.fileName || "").toLowerCase();
-    return type.includes(search) || name.includes(search) || fileName.includes(search);
+    const year = getYearDisplay(item);
+    return type.includes(search) || name.includes(search) || fileName.includes(search) || year.includes(search);
   });
 
   return (
     <div className="flex flex-col h-full bg-slate-50 font-sans">
       
-      {/* HEADER MODERNO */}
       <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-20 px-6 py-4">
         <div className="max-w-5xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4">
@@ -75,7 +81,6 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
                 </div>
             </div>
 
-            {/* BARRA DE PESQUISA */}
             <div className="relative w-full md:w-72 group">
                 <Search size={18} className="absolute left-3 top-3.5 text-slate-400 group-focus-within:text-emerald-500 transition-colors"/>
                 <input 
@@ -106,31 +111,30 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
             </div>
         ) : (
             <div className="max-w-4xl mx-auto relative pb-20">
-                {/* LINHA VERTICAL CENTRAL */}
                 <div className="absolute left-8 md:left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-emerald-500 via-slate-300 to-transparent -translate-x-1/2"></div>
 
                 {filteredItems.map((item, idx) => {
                     const fileName = item.fileName || "Documento";
                     const fileExt = fileName.includes('.') ? fileName.split('.').pop()?.toUpperCase() : "DOC";
-                    const isEven = idx % 2 === 0; // Alternar lados
+                    const isEven = idx % 2 === 0;
+                    
+                    // ✅ CORREÇÃO: Usando a função auxiliar para mostrar o ano correto
+                    const displayYear = getYearDisplay(item);
 
                     return (
                         <div key={item.id || idx} className={`relative flex items-center mb-12 ${isEven ? 'md:flex-row-reverse' : ''} group`}>
                             
-                            {/* ANO (NÓ CENTRAL) */}
+                            {/* ANO (NÓ CENTRAL) - AGORA COM O VALOR CORRETO */}
                             <div className="absolute left-8 md:left-1/2 -translate-x-1/2 w-12 h-12 bg-white border-4 border-slate-100 rounded-2xl flex flex-col items-center justify-center z-10 shadow-lg group-hover:scale-110 group-hover:border-emerald-100 transition-all duration-300">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase leading-none">Ano</span>
-                                <span className="text-sm font-black text-slate-700 leading-none">{item.year || "?"}</span>
+                                <span className="text-sm font-black text-slate-700 leading-none">{displayYear}</span>
                             </div>
 
-                            {/* CARD DE CONTEÚDO */}
                             <div className={`w-full md:w-[45%] pl-20 md:pl-0 ${isEven ? 'md:pr-14' : 'md:pl-14'}`}>
                                 <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 relative overflow-hidden">
                                     
-                                    {/* DETALHE DECORATIVO */}
                                     <div className="absolute top-0 left-0 w-1 h-full bg-emerald-500"></div>
 
-                                    {/* CONTEÚDO */}
                                     <div className="flex justify-between items-start mb-3">
                                         <div>
                                             <h4 className="font-bold text-slate-800 text-sm leading-tight">{item.type}</h4>
@@ -139,7 +143,6 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
                                         <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-1 rounded-md font-bold uppercase tracking-wider border border-slate-200">{fileExt}</span>
                                     </div>
 
-                                    {/* INFO LEGAL */}
                                     {item.law && (
                                         <div className="mb-4 p-2.5 bg-blue-50/50 rounded-xl text-[10px] text-blue-700 border border-blue-100/50 leading-relaxed">
                                             <strong className="block mb-0.5 text-blue-800">Base Legal:</strong>
@@ -147,7 +150,6 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
                                         </div>
                                     )}
 
-                                    {/* BOTÃO */}
                                     {item.fileUrl ? (
                                         <a 
                                             href={item.fileUrl} 

@@ -2,24 +2,28 @@ import { useState, useEffect } from "react";
 import { 
   ArrowLeft, Save, User, FileText, MapPin, Phone, 
   AlertTriangle, Users, Briefcase, Shield, PenTool, 
-  BrainCircuit, Activity // ✅ Ícones restaurados
+  UploadCloud, Trash2, Paperclip, ExternalLink, Check, X, CheckCircle // ✅ CheckCircle adicionado aqui
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
 interface ClientFormProps {
   onBack: () => void;
   clienteId: number | null;
-  // ✅ Novas pontes de comunicação com o App.tsx
   onOpenAnalysis?: (id: number) => void; 
-  onOpenVisualTimeline?: (id: number) => void; 
+  onOpenVisualTimeline?: (id: number) => void;
 }
 
 export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisualTimeline }: ClientFormProps) {
   const [loading, setLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const [idade, setIdade] = useState<number | null>(null);
   
+  // --- NOVOS ESTADOS PARA O FLUXO DE DOCUMENTOS ---
+  const [docNameInput, setDocNameInput] = useState(""); 
+  const [tempUpload, setTempUpload] = useState<{url: string, fileName: string} | null>(null);
+
   // Estado inicial completo
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<any>({
     // 1. Identificação Civil
     nome: "",
     sexo: "Masculino",
@@ -72,6 +76,9 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
     endereco_divergente: false,
     justificativa_endereco: "",
     
+    // 6. Documentos Pessoais
+    personal_docs: [], 
+
     status_processo: "A Iniciar"
   });
 
@@ -101,10 +108,11 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
       .select('*')
       .eq('id', clienteId)
       .single();
-    
+
     if (error) console.error("Erro ao carregar:", error);
     if (data) {
       setFormData({
+        ...data, 
         nome: data.nome || "",
         sexo: data.sexo || "Masculino",
         analfabeto: data.analfabeto || false,
@@ -113,7 +121,6 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
         naturalidade: data.naturalidade || "",
         nacionalidade: data.nacionalidade || "Brasileiro(a)",
         profissao: data.profissao || "Agricultor(a)",
-        
         capacidade_civil: data.capacidade_civil || "Plena",
         rep_nome: data.rep_nome || "",
         rep_cpf: data.rep_cpf || "",
@@ -121,27 +128,23 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
         rep_parentesco: data.rep_parentesco || "",
         rep_endereco: data.rep_endereco || "",
         rep_telefone: data.rep_telefone || "",
-        
         rg: data.rg || "",
         orgao_expedidor: data.orgao_expedidor || "",
         data_expedicao: data.data_expedicao || "",
         nit: data.nit || "",
         ctps: data.ctps || "",
         senha_meu_inss: data.senha_meu_inss || "",
-        
         nome_mae: data.nome_mae || "",
         nome_pai: data.nome_pai || "",
         estado_civil: data.estado_civil || "Solteiro(a)",
         nome_conjuge: data.nome_conjuge || "",
         cpf_conjuge: data.cpf_conjuge || "",
-        
         cep: data.cep || "",
         endereco: data.endereco || "",
         bairro: data.bairro || "",
         cidade: data.cidade || "",
         telefone: data.telefone || "",
         telefone_recado: data.telefone_recado || "",
-        
         resumo_cnis: data.resumo_cnis || "",
         historico_beneficios: data.historico_beneficios || "",
         possui_cnpj: data.possui_cnpj || false,
@@ -150,14 +153,14 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
         detalhes_renda: data.detalhes_renda || "",
         endereco_divergente: data.endereco_divergente || false,
         justificativa_endereco: data.justificativa_endereco || "",
-        
+        personal_docs: data.personal_docs || [], 
         status_processo: data.status_processo || "A Iniciar"
       });
     }
   };
 
   // --- MÁSCARAS ---
-  const mascaraCPF = (v: string) => v.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})/, '$1-$2').replace(/(-\d{2})\d+?$/, '$1'); 
+  const mascaraCPF = (v: string) => v.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})/, '$1-$2').replace(/(-\d{2})\d+?$/, '$1');
   const mascaraTelefone = (v: string) => { v = v.replace(/\D/g, ""); v = v.replace(/^(\d{2})(\d)/g, "($1) $2"); v = v.replace(/(\d)(\d{4})$/, "$1-$2"); return v.substring(0, 15); };
   const mascaraCEP = (v: string) => v.replace(/\D/g, '').replace(/^(\d{5})(\d)/, '$1-$2').substring(0, 9);
 
@@ -191,6 +194,89 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
     }
   };
 
+  // --- 1. SELEÇÃO DO ARQUIVO (UPLOAD PRIMEIRO) ---
+  const handleSelectFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!clienteId) {
+      alert("Salve o cliente pela primeira vez antes de anexar documentos.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+        const fileExt = file.name.split('.').pop();
+        const cleanName = file.name.split('.')[0].replace(/[^a-zA-Z0-9]/g, '_');
+        const timestamp = Date.now();
+        const fileName = `${clienteId}/personal_${timestamp}_${cleanName}.${fileExt}`;
+
+        // Upload para o Supabase
+        const { error: err } = await supabase.storage
+            .from('evidence-files')
+            .upload(fileName, file, { upsert: false });
+
+        if (err) throw err;
+
+        const { data } = supabase.storage
+            .from('evidence-files')
+            .getPublicUrl(fileName);
+
+        // Define o arquivo temporário (aguardando nome)
+        setTempUpload({
+            url: data.publicUrl,
+            fileName: file.name
+        });
+        
+        // Sugere o nome do arquivo como nome do documento (opcional)
+        setDocNameInput(file.name.split('.')[0]);
+
+    } catch (error: any) {
+        alert("Erro no upload: " + error.message);
+    } finally {
+        setUploading(false);
+    }
+  };
+
+  // --- 2. CONFIRMAR E ADICIONAR À LISTA ---
+  const confirmAddDoc = () => {
+      if (!tempUpload) return;
+      if (!docNameInput.trim()) {
+          alert("Por favor, dê um nome ao documento.");
+          return;
+      }
+
+      const newDoc = {
+          name: docNameInput,
+          url: tempUpload.url,
+          fileName: tempUpload.fileName
+      };
+
+      setFormData((prev: any) => ({
+          ...prev,
+          personal_docs: [...(prev.personal_docs || []), newDoc]
+      }));
+
+      // Limpa os estados temporários
+      setTempUpload(null);
+      setDocNameInput("");
+  };
+
+  // --- 3. CANCELAR UPLOAD ---
+  const cancelUpload = () => {
+      setTempUpload(null);
+      setDocNameInput("");
+  };
+
+  const removeDoc = (indexToRemove: number) => {
+      if(confirm("Deseja remover este documento da lista?")) {
+          setFormData((prev: any) => ({
+              ...prev,
+              personal_docs: prev.personal_docs.filter((_: any, idx: number) => idx !== indexToRemove)
+          }));
+      }
+  };
+
   // --- SALVAR ---
   const handleSave = async () => {
     setLoading(true);
@@ -206,7 +292,8 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
         };
 
         if (payload.capacidade_civil === "Plena") {
-            payload.rep_nome = ""; payload.rep_cpf = ""; payload.rep_rg = "";
+            payload.rep_nome = "";
+            payload.rep_cpf = ""; payload.rep_rg = "";
             payload.rep_parentesco = ""; payload.rep_endereco = ""; payload.rep_telefone = "";
         }
 
@@ -252,35 +339,6 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
         </div>
         
         <div className="flex gap-2">
-             {/* --- ✅ BOTÕES DE AÇÃO RESTAURADOS --- */}
-             {clienteId && (
-               <>
-                 {/* 1. Botão Gráfico Visual (Laranja) */}
-                 {onOpenVisualTimeline && (
-                    <button 
-                        onClick={() => onOpenVisualTimeline(clienteId)}
-                        className="bg-orange-100 hover:bg-orange-200 text-orange-700 px-4 py-2 rounded-lg font-bold border border-orange-200 flex items-center gap-2 transition"
-                        title="Ver Linha do Tempo Visual (Gráfico)"
-                    >
-                        <Activity size={20}/> 
-                        <span className="hidden md:inline">Gráfico Visual</span>
-                    </button>
-                 )}
-
-                 {/* 2. Botão Análise IA (Roxo) */}
-                 {onOpenAnalysis && (
-                    <button 
-                        onClick={() => onOpenAnalysis(clienteId)}
-                        className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold shadow-lg shadow-indigo-500/30 flex items-center gap-2 transition"
-                        title="Ver Parecer Jurídico (IA)"
-                    >
-                        <BrainCircuit size={20} className="text-indigo-200"/> 
-                        <span className="hidden md:inline">Análise IA</span>
-                    </button>
-                 )}
-               </>
-            )}
-
             <button onClick={handleSave} disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold shadow flex items-center gap-2 transition-all active:scale-95 disabled:opacity-50">
                 <Save size={18}/> {loading ? "..." : "Salvar"}
             </button>
@@ -297,7 +355,7 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="col-span-1 md:col-span-2">
                     <label className="text-xs font-bold text-slate-500 uppercase ml-1">Nome Completo</label>
-                    <input name="nome" value={formData.nome} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500 transition-colors uppercase" placeholder="NOME DO SEGURADO"/>
+                    <input name="nome" value={formData.nome} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500 transition-colors" placeholder="Nome do Segurado"/>
                 </div>
                 
                 <div>
@@ -384,7 +442,7 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <div className="col-span-1 md:col-span-2">
                         <label className="text-xs font-bold text-amber-700/70 uppercase ml-1">Nome do Representante</label>
-                        <input name="rep_nome" value={formData.rep_nome} onChange={handleChange} className="w-full border border-amber-300 bg-white rounded-lg p-3 text-sm outline-none focus:border-amber-500 uppercase"/>
+                        <input name="rep_nome" value={formData.rep_nome} onChange={handleChange} className="w-full border border-amber-300 bg-white rounded-lg p-3 text-sm outline-none focus:border-amber-500"/>
                     </div>
                     <div>
                         <label className="text-xs font-bold text-amber-700/70 uppercase ml-1">Vínculo</label>
@@ -428,7 +486,7 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
                 </div>
                 <div>
                     <label className="text-xs font-bold text-slate-500 uppercase ml-1">Órgão Exp.</label>
-                    <input name="orgao_expedidor" value={formData.orgao_expedidor} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-blue-500 uppercase"/>
+                    <input name="orgao_expedidor" value={formData.orgao_expedidor} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-blue-500"/>
                 </div>
                 <div className="relative">
                     <label className="text-xs font-bold text-slate-500 uppercase ml-1 flex justify-between">
@@ -460,12 +518,13 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                     <label className="text-xs font-bold text-slate-500 uppercase ml-1">Mãe</label>
-                    <input name="nome_mae" value={formData.nome_mae} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-purple-500 uppercase"/>
+                    <input name="nome_mae" value={formData.nome_mae} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-purple-500"/>
                 </div>
                 <div>
                     <label className="text-xs font-bold text-slate-500 uppercase ml-1">Pai</label>
-                    <input name="nome_pai" value={formData.nome_pai} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-purple-500 uppercase"/>
+                    <input name="nome_pai" value={formData.nome_pai} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-purple-500"/>
                 </div>
+            
                 <div>
                     <label className="text-xs font-bold text-slate-500 uppercase ml-1">Estado Civil</label>
                     <select name="estado_civil" value={formData.estado_civil} onChange={handleChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none bg-white">
@@ -480,7 +539,7 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
                     <>
                         <div className="animate-in fade-in slide-in-from-top-2">
                             <label className="text-xs font-bold text-purple-600 uppercase ml-1">Cônjuge</label>
-                            <input name="nome_conjuge" value={formData.nome_conjuge} onChange={handleChange} className="w-full border border-purple-200 bg-purple-50 rounded-lg p-3 text-sm outline-none focus:border-purple-500 uppercase"/>
+                            <input name="nome_conjuge" value={formData.nome_conjuge} onChange={handleChange} className="w-full border border-purple-200 bg-purple-50 rounded-lg p-3 text-sm outline-none focus:border-purple-500"/>
                         </div>
                         <div className="animate-in fade-in slide-in-from-top-2">
                             <label className="text-xs font-bold text-purple-600 uppercase ml-1">CPF Cônjuge</label>
@@ -539,6 +598,7 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
                     <textarea name="historico_beneficios" value={formData.historico_beneficios} onChange={handleChange} rows={3} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-red-500"/>
                 </div>
             </div>
+        
             <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
                 <div>
                     <div className="flex items-center gap-2 mb-2">
@@ -567,6 +627,98 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
                         <input name="justificativa_endereco" value={formData.justificativa_endereco} onChange={handleChange} className="w-full border border-red-300 bg-red-50 rounded-lg p-2 text-sm outline-none focus:border-red-500 ml-7 w-[calc(100%-1.75rem)]"/>
                     )}
                 </div>
+            </div>
+        </section>
+
+        {/* 6. DOCUMENTOS PESSOAIS BÁSICOS (FLUXO ANEXAR -> NOMEAR) */}
+        <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h2 className="text-lg font-bold text-slate-700 mb-6 flex items-center gap-2 border-b pb-2">
+                <Paperclip className="text-indigo-500"/> 6. Documentos Pessoais Básicos
+            </h2>
+            
+            {/* Lista de Documentos Anexados */}
+            {formData.personal_docs && formData.personal_docs.length > 0 && (
+                <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {formData.personal_docs.map((doc: any, idx: number) => (
+                        <div key={idx} className="flex items-center justify-between p-3 bg-indigo-50 border border-indigo-100 rounded-lg">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                                <FileText size={16} className="text-indigo-600 shrink-0"/>
+                                <span className="text-sm font-medium text-indigo-900 truncate">{doc.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <a href={doc.url} target="_blank" rel="noreferrer" className="p-1.5 hover:bg-indigo-200 rounded text-indigo-600 transition" title="Ver Documento">
+                                    <ExternalLink size={16}/>
+                                </a>
+                                <button onClick={() => removeDoc(idx)} className="p-1.5 hover:bg-red-200 rounded text-red-600 transition" title="Excluir">
+                                    <Trash2 size={16}/>
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+
+            {/* Área de Anexo (Upload -> Nomeação) */}
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex flex-col items-center justify-center">
+                
+                {!tempUpload ? (
+                    // ESTADO 1: BOTÃO PARA SELECIONAR ARQUIVO
+                    <div className="w-full">
+                        <input 
+                            type="file" 
+                            id="doc-upload" 
+                            className="hidden" 
+                            onChange={handleSelectFile}
+                            disabled={uploading}
+                        />
+                        <label 
+                            htmlFor="doc-upload" 
+                            className={`flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-xl cursor-pointer transition-all w-full
+                                ${uploading ? 'bg-slate-100 border-slate-300 opacity-50' : 'bg-white border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50'}
+                            `}
+                        >
+                            <UploadCloud size={32} className={`mb-3 ${uploading ? 'text-slate-400 animate-bounce' : 'text-indigo-400'}`}/>
+                            <span className="text-sm font-bold text-indigo-700">
+                                {uploading ? "Enviando arquivo..." : "Clique para anexar documento"}
+                            </span>
+                            <span className="text-xs text-slate-400 mt-1">PDF, JPG, PNG (Max 5MB)</span>
+                        </label>
+                    </div>
+                ) : (
+                    // ESTADO 2: ARQUIVO CARREGADO -> DAR NOME
+                    <div className="w-full bg-white p-4 rounded-xl border border-indigo-200 shadow-sm animate-in fade-in zoom-in-95">
+                        <div className="flex items-center gap-3 mb-4 text-sm text-indigo-800 bg-indigo-50 p-2 rounded-lg">
+                            <CheckCircle size={16} className="text-emerald-500"/>
+                            <span className="truncate flex-1 font-medium">Arquivo pronto: <strong>{tempUpload.fileName}</strong></span>
+                        </div>
+                        
+                        <label className="text-xs font-bold text-slate-500 uppercase ml-1 mb-1.5 block">Nome do Documento</label>
+                        <div className="flex gap-2">
+                            <input 
+                                type="text" 
+                                placeholder="Ex: Identidade, Comprovante de Residência..." 
+                                className="flex-1 p-3 border border-slate-300 rounded-lg outline-none focus:border-indigo-500 text-sm"
+                                value={docNameInput}
+                                onChange={e => setDocNameInput(e.target.value)}
+                                autoFocus
+                            />
+                            <button 
+                                onClick={confirmAddDoc}
+                                disabled={!docNameInput.trim()}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold disabled:opacity-50 transition-colors"
+                            >
+                                <Check size={20}/>
+                            </button>
+                            <button 
+                                onClick={cancelUpload}
+                                className="bg-slate-100 hover:bg-slate-200 text-slate-500 px-4 py-2 rounded-lg font-bold transition-colors"
+                            >
+                                <X size={20}/>
+                            </button>
+                        </div>
+                    </div>
+                )}
+
             </div>
         </section>
 
