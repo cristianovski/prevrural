@@ -172,7 +172,6 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
     if (name === 'telefone' || name === 'telefone_recado' || name === 'rep_telefone') value = mascaraTelefone(value);
     if (name === 'cep') value = mascaraCEP(value);
 
-    // ✅ CORREÇÃO AQUI: Adicionado (prev: any)
     setFormData((prev: any) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
@@ -183,7 +182,6 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
         const res = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
         const data = await res.json();
         if (!data.erro) {
-          // ✅ CORREÇÃO AQUI: Adicionado (prev: any)
           setFormData((prev: any) => ({
             ...prev,
             endereco: data.logradouro,
@@ -254,7 +252,6 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
           fileName: tempUpload.fileName
       };
 
-      // ✅ CORREÇÃO AQUI: Adicionado (prev: any)
       setFormData((prev: any) => ({
           ...prev,
           personal_docs: [...(prev.personal_docs || []), newDoc]
@@ -273,7 +270,6 @@ export function ClientFormPage({ onBack, clienteId, onOpenAnalysis, onOpenVisual
 
   const removeDoc = (indexToRemove: number) => {
       if(confirm("Deseja remover este documento da lista?")) {
-          // ✅ CORREÇÃO AQUI: Adicionado (prev: any)
           setFormData((prev: any) => ({
               ...prev,
               personal_docs: prev.personal_docs.filter((_: any, idx: number) => idx !== indexToRemove)

@@ -1,14 +1,15 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// ✅ SUA CHAVE
-const API_KEY = "AIzaSyBsCtZd_47M-lNG70rm6--U6BYRgqEKW-A"; 
+const API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
-const genAI = new GoogleGenerativeAI(API_KEY);
+if (!API_KEY) {
+  console.error("VITE_GOOGLE_API_KEY não encontrada no .env");
+}
+
+const genAI = new GoogleGenerativeAI(API_KEY || "");
 
 export async function gerarParecerIA(cliente: any, teseJuridica: string) {
   try {
-    // 🎯 CORREÇÃO: Usando o ALIAS "gemini-flash-latest" (Item 16 da sua lista)
-    // Isso garante que sempre pegaremos a versão estável mais recente (seja 2.0, 2.5 ou 3.0)
     const model = genAI.getGenerativeModel({ model: "gemini-flash-latest" });
 
     const prompt = `

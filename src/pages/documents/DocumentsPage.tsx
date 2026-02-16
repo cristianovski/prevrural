@@ -10,8 +10,8 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { saveAs } from 'file-saver';
 import { asBlob } from 'html-docx-js-typescript';
 
-// CHAVE API
-const GEMINI_API_KEY = "AIzaSyBsCtZd_47M-lNG70rm6--U6BYRgqEKW-A";
+// CHAVE API DO .ENV
+const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
 // MODELOS
 const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-3-flash", "gemini-2.0-flash"];
@@ -239,7 +239,7 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
             <div>
                 <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2"><FileText className="text-blue-600"/> Editor de Documentos</h1>
                 <p className="text-xs text-slate-500">
-                    {officeProfile ? `Gerando como: ${officeProfile.nome_advogado}` : "Configure seu escritório"}
+                     {officeProfile ? `Gerando como: ${officeProfile.nome_advogado}` : "Configure seu escritório"}
                 </p>
             </div>
         </div>
@@ -287,7 +287,7 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
             <aside className="w-[350px] bg-white border-l border-slate-200 flex flex-col shadow-xl z-30 animate-in slide-in-from-right">
                 <div className="p-3 border-b bg-slate-50 flex justify-between items-center"><h3 className="font-bold text-slate-700 text-sm flex items-center gap-2"><Sparkles size={14} className="text-purple-600"/> IA</h3><button onClick={() => setIsChatOpen(false)}><X size={16}/></button></div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50/50">
-                    {chatMessages.map((msg, idx) => (<div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[90%] p-2.5 rounded-lg text-xs ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-white border shadow-sm text-slate-700'}`}>{msg.text}</div></div>))}
+                     {chatMessages.map((msg, idx) => (<div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[90%] p-2.5 rounded-lg text-xs ${msg.role === 'user' ? 'bg-blue-600 text-white' : 'bg-white border shadow-sm text-slate-700'}`}>{msg.text}</div></div>))}
                     {chatLoading && <div className="text-xs text-slate-400 animate-pulse ml-2">...</div>}
                     <div ref={chatEndRef}/>
                 </div>

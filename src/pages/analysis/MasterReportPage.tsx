@@ -7,8 +7,8 @@ import {
 import { supabase } from "../../lib/supabase";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// CHAVE API
-const GEMINI_API_KEY = "AIzaSyBsCtZd_47M-lNG70rm6--U6BYRgqEKW-A";
+// CHAVE API DO .ENV
+const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
 interface ReportProps {
   cliente: any;
@@ -240,7 +240,7 @@ export function MasterReportPage({ cliente, onBack }: ReportProps) {
                                 <td className="py-1 text-slate-500 uppercase text-xs font-bold">Profissão:</td>
                                 <td className="py-1">{cliente.profissao || "Rural"}</td>
                             </tr>
-                             <tr>
+                            <tr>
                                 <td className="py-1 text-slate-500 uppercase text-xs font-bold">Endereço:</td>
                                 <td className="py-1">{cliente.endereco || "-"}</td>
                             </tr>
