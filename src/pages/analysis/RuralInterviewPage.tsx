@@ -3,11 +3,11 @@ import {
   ArrowLeft, Save, FileText, Mic, MicOff, UploadCloud, 
   Plus, Trash2, Paperclip, CheckCircle, Calendar, 
   AlertTriangle, BookOpen, Scale, Tractor, Users, 
-  ShoppingBag, HelpCircle
+  ShoppingBag, HelpCircle, LayoutList, ChevronRight
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
-// --- LISTA DE DOCUMENTOS (30 ITENS) ---
+// --- LISTA DE DOCUMENTOS (30 ITENS - MANTIDA INTEGRALMENTE) ---
 const DOCUMENT_OPTIONS = [
   { type: "Autodeclaração do Segurado Especial", law: "Lei 8.213/91, Art. 38-B, § 2º; IN 128/2022, Art. 115", obs: "Principal para períodos anteriores a 2023. Deve ser ratificada por bases governamentais." },
   { type: "Bloco de Notas do Produtor Rural", law: "Lei 8.213/91, Art. 106, V; IN 128/2022, Art. 116, III", obs: "Prova robusta de comercialização e atividade ativa." },
@@ -49,13 +49,14 @@ interface RuralInterviewPageProps {
 export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps) {
   const [loading, setLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'dados' | 'narrativa' | 'docs'>('dados');
   const [listeningField, setListeningField] = useState<string | null>(null);
   
   // Estado da Narrativa e Timeline
   const [historico, setHistorico] = useState("");
   const [timeline, setTimeline] = useState<any[]>([]);
 
-  // Dados Estruturados (Novo Modelo JSON)
+  // Dados Estruturados
   const [ruralData, setRuralData] = useState<any>({
     nome_imovel: "",
     itr_nirf: "",
@@ -117,7 +118,7 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
     setRuralData({ ...ruralData, [e.target.name]: e.target.value });
   };
 
-  // --- LÓGICA DE DITADO POR VOZ (RESTAURADA) ---
+  // --- LÓGICA DE DITADO (MANTIDA) ---
   const toggleListening = (fieldName: string, isNarrative: boolean = false) => {
     if (listeningField === fieldName) {
         setListeningField(null);
@@ -134,7 +135,6 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
     recognition.onstart = () => setListeningField(fieldName);
     recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
-        
         if (isNarrative) {
             setHistorico(prev => (prev ? prev + ' ' : '') + transcript);
         } else {
@@ -217,203 +217,287 @@ export function RuralInterviewPage({ cliente, onBack }: RuralInterviewPageProps)
     }
   };
 
-  // Helper para renderizar input com microfone
+  // Helper renderizado com estilo atualizado
   const MicInput = ({ label, name, placeholder, textarea = false }: any) => (
-      <div className="mb-1">
-          <div className="flex justify-between items-center mb-1">
-              <label className="text-xs font-bold text-slate-500 block">{label}</label>
-              <button onClick={() => toggleListening(name)} className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full transition-all ${listeningField === name ? 'bg-red-500 text-white animate-pulse' : 'text-slate-400 hover:bg-slate-100'}`}>
+      <div className="mb-4">
+          <label className="text-xs font-bold text-slate-500 mb-1.5 flex justify-between items-center">
+              {label}
+              <button onClick={() => toggleListening(name)} className={`flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full transition-all ${listeningField === name ? 'bg-red-500 text-white animate-pulse' : 'text-slate-400 hover:bg-slate-100 hover:text-emerald-600'}`}>
                    {listeningField === name ? <><MicOff size={10}/> Gravando...</> : <><Mic size={10}/> Ditar</>}
               </button>
-          </div>
+          </label>
           {textarea ? (
-              <textarea name={name} value={ruralData[name]} onChange={handleRuralChange} rows={3} className={`w-full p-2 border rounded text-sm resize-none transition-colors ${listeningField === name ? 'bg-red-50 border-red-300' : ''}`} placeholder={placeholder} />
+              <textarea name={name} value={ruralData[name]} onChange={handleRuralChange} rows={3} className={`w-full p-3 border rounded-xl text-sm resize-none transition-all outline-none focus:ring-4 focus:ring-emerald-500/10 ${listeningField === name ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500'}`} placeholder={placeholder} />
           ) : (
-              <input name={name} value={ruralData[name]} onChange={handleRuralChange} className={`w-full p-2 border rounded text-sm transition-colors ${listeningField === name ? 'bg-red-50 border-red-300' : ''}`} placeholder={placeholder} />
+              <input name={name} value={ruralData[name]} onChange={handleRuralChange} className={`w-full p-3 border rounded-xl text-sm transition-all outline-none focus:ring-4 focus:ring-emerald-500/10 ${listeningField === name ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500'}`} placeholder={placeholder} />
           )}
       </div>
   );
 
   return (
-    <div className="flex flex-col h-full bg-slate-50">
+    <div className="flex flex-col h-full bg-slate-50 font-sans">
       
       {/* HEADER */}
-      <header className="bg-white border-b p-4 flex justify-between items-center sticky top-0 z-10 shadow-sm">
+      <header className="bg-white border-b border-slate-200 p-4 sticky top-0 z-20 shadow-sm flex items-center justify-between">
         <div className="flex items-center gap-4">
-            <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-full transition"><ArrowLeft className="text-slate-600"/></button>
+            <button onClick={onBack} className="p-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition text-slate-600">
+                <ArrowLeft size={20}/>
+            </button>
             <div>
-                <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2"><Tractor className="text-emerald-600"/> Entrevista & Provas</h1>
-                <p className="text-xs text-slate-500">Cliente: {cliente.nome}</p>
+                <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    Entrevista & Provas
+                </h1>
+                <p className="text-xs font-medium text-slate-500">{cliente.nome}</p>
             </div>
         </div>
-        <button onClick={handleSave} disabled={loading} className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-lg font-bold text-sm shadow flex items-center gap-2 transition disabled:opacity-50">
-            {loading ? "Salvando..." : <><Save size={16}/> Salvar Tudo</>}
+        <button onClick={handleSave} disabled={loading} className="bg-slate-900 hover:bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-slate-900/10 flex items-center gap-2 transition-all disabled:opacity-50 hover:scale-105 active:scale-95">
+            {loading ? "Salvando..." : <><Save size={18}/> Salvar Tudo</>}
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto p-6 space-y-6">
-
-        {/* MODO DITADO AVISO */}
-        <div className="bg-blue-50 border border-blue-100 p-3 rounded-xl flex items-center gap-3">
-            <HelpCircle className="text-blue-500 shrink-0" size={18}/>
-            <p className="text-xs text-blue-700"><strong>Modo Ditado:</strong> Clique em "Ditar" nos campos abaixo para preencher falando. O sistema converte sua voz em texto automaticamente.</p>
-        </div>
+      <div className="flex-1 flex overflow-hidden">
         
-        {/* --- 1. DADOS DA ATIVIDADE RURAL --- */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-6">
-            <h3 className="font-bold text-slate-700 flex items-center gap-2 border-b pb-2"><Tractor size={18} className="text-slate-400"/> 1. Dados da Atividade Rural</h3>
-
-            {/* A. TERRA */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="md:col-span-2"><MicInput name="nome_imovel" label="Nome do Imóvel / Sítio" placeholder="Ex: Fazenda Boa Esperança"/></div>
-                <div><MicInput name="municipio_uf" label="Município / UF"/></div>
-                <div><MicInput name="itr_nirf" label="ITR / NIRF / CCIR" placeholder="Opcional"/></div>
-                <div><MicInput name="area_total" label="Área Total (Hectares)"/></div>
-                <div>
-                    <label className="text-xs font-bold text-slate-500 block mb-1">Condição de Posse</label>
-                    <select name="condicao_posse" value={ruralData.condicao_posse} onChange={handleRuralChange} className="w-full p-2 border rounded text-sm bg-white">
-                        <option value="proprietario">Proprietário</option>
-                        <option value="posseiro">Posseiro</option>
-                        <option value="arrendatario">Arrendatário</option>
-                        <option value="parceiro">Parceiro / Meeiro</option>
-                        <option value="comodatario">Comodatário</option>
-                        <option value="assentado">Assentado</option>
-                    </select>
-                </div>
-            </div>
-
-            {/* B. OUTORGANTE */}
-            {ruralData.condicao_posse !== 'proprietario' && ruralData.condicao_posse !== 'posseiro' && (
-                 <div className="bg-amber-50 p-4 rounded-lg border border-amber-100">
-                    <label className="text-xs font-bold text-amber-800 block mb-2 flex items-center gap-1"><Users size={12}/> Proprietário da Terra (Outorgante)</label>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <MicInput name="outorgante_nome" label="Nome do Dono" placeholder="Nome Completo"/>
-                        <MicInput name="outorgante_cpf" label="CPF do Dono" placeholder="000.000.000-00"/>
-                    </div>
-                 </div>
-            )}
-
-            {/* C. PRODUÇÃO E FAMÍLIA */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-                <MicInput name="culturas" label="O que produz/cria?" placeholder="Ex: Milho, Feijão, Mandioca, Galinhas..." textarea/>
-                <MicInput name="grupo_familiar" label="Grupo Familiar (Quem ajuda?)" placeholder="Nome dos filhos, esposa, parentes..." textarea/>
-            </div>
-
-            {/* D. COMERCIALIZAÇÃO */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                 <MicInput name="locais_venda" label="Onde vende a produção?" placeholder="Ex: Feira, Cooperativa, Consumo Próprio"/>
-                 <div className="grid grid-cols-2 gap-2">
-                    <div>
-                        <label className="text-xs font-bold text-slate-500 block mb-1">Tem Empregados?</label>
-                        <select name="tem_empregados" value={ruralData.tem_empregados} onChange={handleRuralChange} className="w-full p-2 border rounded text-sm bg-white">
-                            <option value="nao">Não (Regime Familiar)</option>
-                            <option value="sim">Sim (Temporário)</option>
-                            <option value="sim_permanente">Sim (Permanente)</option>
-                        </select>
-                    </div>
-                    {ruralData.tem_empregados !== 'nao' && (
-                        <div><MicInput name="tempo_empregados" label="Por quanto tempo?" placeholder="Ex: 2 dias na colheita"/></div>
-                    )}
-                 </div>
-            </div>
-        </div>
-
-        {/* 2. NARRATIVA */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <div className="flex justify-between items-center mb-4 border-b pb-2">
-                <h3 className="font-bold text-slate-700 flex items-center gap-2"><FileText size={18} className="text-slate-400"/> 2. Narrativa dos Fatos</h3>
-                <button onClick={() => toggleListening('historico', true)} className={`flex items-center gap-1 text-xs px-3 py-1 rounded-full transition-all ${listeningField === 'historico' ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 text-slate-600'}`}>
-                    {listeningField === 'historico' ? <><MicOff size={12}/> Gravando...</> : <><Mic size={12}/> Ditar História</>}
+        {/* SIDEBAR DE NAVEGAÇÃO (WIZARD) */}
+        <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col p-6 overflow-y-auto">
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-6">Etapas da Entrevista</h3>
+            <nav className="space-y-2">
+                <button onClick={() => setActiveTab('dados')} className={`w-full text-left p-3 rounded-xl flex items-center gap-3 transition-all ${activeTab === 'dados' ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-100 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
+                    <Tractor size={18}/> Dados da Terra
                 </button>
-            </div>
-            <textarea 
-                className={`w-full h-40 p-4 border rounded-xl outline-none text-sm leading-relaxed resize-none transition-colors ${listeningField === 'historico' ? 'bg-red-50 border-red-300' : 'bg-slate-50 border-slate-200 focus:bg-white focus:border-emerald-500'}`}
-                placeholder="Descreva a história rural: locais, patrões, safras, regime de economia familiar..."
-                value={historico}
-                onChange={e => setHistorico(e.target.value)}
-            />
-        </div>
+                <button onClick={() => setActiveTab('narrativa')} className={`w-full text-left p-3 rounded-xl flex items-center gap-3 transition-all ${activeTab === 'narrativa' ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-100 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
+                    <FileText size={18}/> Narrativa
+                </button>
+                <button onClick={() => setActiveTab('docs')} className={`w-full text-left p-3 rounded-xl flex items-center gap-3 transition-all ${activeTab === 'docs' ? 'bg-emerald-50 text-emerald-700 font-bold border border-emerald-100 shadow-sm' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'}`}>
+                    <Paperclip size={18}/> Documentos
+                    <span className="ml-auto bg-slate-100 text-slate-600 text-[10px] py-0.5 px-2 rounded-full font-bold">{timeline.length}</span>
+                </button>
+            </nav>
 
-        {/* 3. ACERVO */}
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-            <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Paperclip size={18} className="text-slate-400"/> 3. Acervo Probatório (Documentos)</h3>
-
-            {/* FORMULÁRIO UPLOAD */}
-            <div className="bg-slate-50 p-5 rounded-xl border border-slate-200 mb-6">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                    <div className="md:col-span-5">
-                        <label className="text-xs font-bold text-slate-500 block mb-1">Tipo de Documento</label>
-                        <select value={newItem.type} onChange={e => setNewItem({...newItem, type: e.target.value})} className="w-full p-2.5 border rounded-lg bg-white outline-none focus:border-amber-500 text-sm">
-                            {DOCUMENT_OPTIONS.map((d, i) => <option key={i} value={d.type}>{d.type}</option>)}
-                        </select>
-                    </div>
-
-                    {newItem.type === 'Outros' ? (
-                        <div className="md:col-span-3 animate-in fade-in">
-                            <label className="text-xs font-bold text-slate-500 block mb-1">Nome</label>
-                            <input className="w-full p-2.5 border rounded-lg outline-none focus:border-amber-500 text-sm" placeholder="Nome..." value={newItem.customName} onChange={e => setNewItem({...newItem, customName: e.target.value})}/>
-                        </div>
-                    ) : <div className="md:col-span-3"/>}
-
-                    <div className="md:col-span-2">
-                        <label className="text-xs font-bold text-slate-500 block mb-1">Ano</label>
-                        <input type="number" placeholder="S/D" className="w-full p-2.5 border rounded-lg outline-none focus:border-amber-500 text-sm" value={newItem.year} onChange={e => setNewItem({...newItem, year: e.target.value})}/>
-                    </div>
-
-                    <div className="md:col-span-2">
-                        <div className="relative">
-                            <input type="file" id="up" className="hidden" onChange={handleFileUpload} disabled={uploading} />
-                            <label htmlFor="up" className={`flex justify-center gap-2 p-2.5 border border-dashed rounded-lg cursor-pointer transition-all ${newItem.fileUrl ? "bg-emerald-50 border-emerald-400 text-emerald-700" : "bg-white border-slate-300 hover:bg-slate-100"}`}>
-                                {uploading ? <UploadCloud size={16} className="animate-bounce"/> : newItem.fileUrl ? <CheckCircle size={16}/> : <UploadCloud size={16}/>}
-                            </label>
-                        </div>
-                    </div>
-
-                    {selectedDocInfo && (
-                        <div className="md:col-span-12 bg-blue-50 p-3 rounded-lg border border-blue-100 text-xs text-blue-800 mt-2 flex flex-col gap-1">
-                            <div className="flex gap-2 items-center font-bold"><Scale size={14}/> {selectedDocInfo.law}</div>
-                            <div className="flex gap-2 items-start pl-5 opacity-90"><BookOpen size={14} className="mt-0.5 shrink-0"/> {selectedDocInfo.obs}</div>
-                        </div>
-                    )}
-
-                    <div className="md:col-span-12 flex justify-end">
-                        <button onClick={handleAddItem} disabled={!newItem.fileUrl} className={`px-6 py-2.5 rounded-lg font-bold text-xs flex items-center gap-2 transition ${newItem.fileUrl ? "bg-slate-800 text-white hover:bg-slate-700 shadow-sm" : "bg-slate-300 text-slate-500 cursor-not-allowed"}`}>
-                            <Plus size={16}/> Adicionar à Lista
-                        </button>
-                    </div>
+            <div className="mt-auto bg-blue-50 p-4 rounded-xl border border-blue-100">
+                <div className="flex gap-2 items-start text-xs text-blue-700">
+                    <HelpCircle size={16} className="shrink-0 mt-0.5"/>
+                    <p>Use o botão <strong>Ditar</strong> para preencher os campos falando. O sistema transcreve automaticamente.</p>
                 </div>
             </div>
+        </aside>
 
-            {/* LISTA */}
-            <div className="space-y-3">
-                {timeline.length === 0 && (
-                    <div className="text-center py-10 text-slate-400 border-2 border-dashed border-slate-100 rounded-xl">
-                        <p>Nenhum documento adicionado ainda.</p>
-                        <p className="text-xs mt-1">Faça o upload acima para começar.</p>
+        {/* ÁREA PRINCIPAL */}
+        <main className="flex-1 overflow-y-auto p-6 md:p-10 scroll-smooth">
+            <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+                
+                {/* --- ABA 1: DADOS RURAIS --- */}
+                {activeTab === 'dados' && (
+                    <div className="space-y-8">
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-bold text-slate-800 mb-2">Atividade Rural</h2>
+                            <p className="text-slate-500">Detalhes sobre a propriedade, regime de economia e produção.</p>
+                        </div>
+
+                        <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                            <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2"><LayoutList size={20} className="text-emerald-500"/> Caracterização do Imóvel</h3>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <MicInput name="nome_imovel" label="Nome do Imóvel / Sítio" placeholder="Ex: Fazenda Boa Esperança"/>
+                                <MicInput name="municipio_uf" label="Município / UF"/>
+                                <MicInput name="itr_nirf" label="ITR / NIRF / CCIR" placeholder="Opcional"/>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <MicInput name="area_total" label="Área Total (Ha)"/>
+                                    <div>
+                                        <label className="text-xs font-bold text-slate-500 mb-1.5 block">Condição de Posse</label>
+                                        <div className="relative">
+                                            <select name="condicao_posse" value={ruralData.condicao_posse} onChange={handleRuralChange} className="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 outline-none focus:ring-4 focus:ring-emerald-500/10 appearance-none">
+                                                <option value="proprietario">Proprietário</option>
+                                                <option value="posseiro">Posseiro</option>
+                                                <option value="arrendatario">Arrendatário</option>
+                                                <option value="parceiro">Parceiro / Meeiro</option>
+                                                <option value="comodatario">Comodatário</option>
+                                                <option value="assentado">Assentado</option>
+                                            </select>
+                                            <div className="absolute right-3 top-3.5 pointer-events-none text-slate-400"><ChevronRight size={14} className="rotate-90"/></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* CONDICIONAL: SE NÃO FOR PROPRIETÁRIO */}
+                            {!['proprietario', 'posseiro'].includes(ruralData.condicao_posse) && (
+                                <div className="mt-4 p-5 bg-amber-50 rounded-2xl border border-amber-100 animate-in fade-in">
+                                    <h4 className="font-bold text-amber-800 text-sm mb-4 flex items-center gap-2"><Users size={16}/> Dados do Proprietário da Terra (Outorgante)</h4>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <MicInput name="outorgante_nome" label="Nome do Dono" placeholder="Nome Completo"/>
+                                        <MicInput name="outorgante_cpf" label="CPF do Dono" placeholder="000.000.000-00"/>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm">
+                            <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2"><ShoppingBag size={20} className="text-emerald-500"/> Produção & Família</h3>
+                            
+                            <div className="space-y-4">
+                                <MicInput name="culturas" label="O que produz/cria?" placeholder="Ex: Milho, Feijão, Mandioca, Galinhas..." textarea/>
+                                <MicInput name="grupo_familiar" label="Grupo Familiar (Quem ajuda?)" placeholder="Nome dos filhos, esposa, parentes..." textarea/>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+                                    <MicInput name="locais_venda" label="Onde vende a produção?" placeholder="Ex: Feira, Cooperativa, Consumo Próprio"/>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs font-bold text-slate-500 mb-1.5 block">Tem Empregados?</label>
+                                            <div className="relative">
+                                                <select name="tem_empregados" value={ruralData.tem_empregados} onChange={handleRuralChange} className="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 outline-none focus:ring-4 focus:ring-emerald-500/10 appearance-none">
+                                                    <option value="nao">Não</option>
+                                                    <option value="sim">Sim (Temp.)</option>
+                                                    <option value="sim_permanente">Sim (Perm.)</option>
+                                                </select>
+                                                <div className="absolute right-3 top-3.5 pointer-events-none text-slate-400"><ChevronRight size={14} className="rotate-90"/></div>
+                                            </div>
+                                        </div>
+                                        {ruralData.tem_empregados !== 'nao' && (
+                                            <div className="animate-in fade-in"><MicInput name="tempo_empregados" label="Tempo?" placeholder="Dias/ano"/></div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end pt-4">
+                            <button onClick={() => setActiveTab('narrativa')} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-sm shadow-lg shadow-slate-900/10 flex items-center gap-2 hover:scale-105 transition-all">
+                                Próxima Etapa <ChevronRight size={16}/>
+                            </button>
+                        </div>
                     </div>
                 )}
-                {timeline.map((item, idx) => (
-                    <div key={item.id || idx} className="flex justify-between items-center p-4 bg-white border border-slate-100 rounded-xl hover:border-amber-300 transition-all shadow-sm">
-                        <div className="flex items-center gap-4">
-                            <div className="bg-amber-100 text-amber-800 font-bold px-3 py-2 rounded-lg text-sm min-w-[60px] text-center flex flex-col items-center">
-                                <Calendar size={12} className="opacity-50 mb-0.5"/>
-                                {item.year > 0 ? item.year : "S/D"}
+
+                {/* --- ABA 2: NARRATIVA --- */}
+                {activeTab === 'narrativa' && (
+                    <div className="space-y-6">
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-bold text-slate-800 mb-2">Narrativa Fática</h2>
+                            <p className="text-slate-500">A história de vida rural do cliente para a petição inicial.</p>
+                        </div>
+
+                        <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm h-[60vh] flex flex-col relative">
+                            <button 
+                                onClick={() => toggleListening('historico', true)} 
+                                className={`absolute top-6 right-6 flex items-center gap-2 px-4 py-2 rounded-full font-bold text-xs transition-all shadow-sm z-10 ${listeningField === 'historico' ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-100 text-slate-600 hover:bg-emerald-50 hover:text-emerald-700'}`}
+                            >
+                                {listeningField === 'historico' ? <><MicOff size={14}/> Gravando...</> : <><Mic size={14}/> Iniciar Ditado</>}
+                            </button>
+
+                            <textarea 
+                                className={`w-full h-full p-6 border rounded-2xl outline-none text-base leading-relaxed resize-none transition-colors ${listeningField === 'historico' ? 'bg-red-50/50 border-red-200' : 'bg-slate-50 border-slate-100 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10'}`}
+                                placeholder="Clique em 'Iniciar Ditado' e conte a história do cliente..."
+                                value={historico}
+                                onChange={e => setHistorico(e.target.value)}
+                            />
+                        </div>
+
+                        <div className="flex justify-end pt-4">
+                            <button onClick={() => setActiveTab('docs')} className="bg-slate-900 text-white px-8 py-3 rounded-xl font-bold text-sm shadow-lg shadow-slate-900/10 flex items-center gap-2 hover:scale-105 transition-all">
+                                Ir para Documentos <ChevronRight size={16}/>
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {/* --- ABA 3: DOCUMENTOS --- */}
+                {activeTab === 'docs' && (
+                    <div className="space-y-8">
+                        <div className="mb-6">
+                            <h2 className="text-2xl font-bold text-slate-800 mb-2">Acervo Probatório</h2>
+                            <p className="text-slate-500">Adicione e gerencie as provas materiais do processo.</p>
+                        </div>
+
+                        {/* CARD DE ADIÇÃO */}
+                        <div className="bg-white p-6 md:p-8 rounded-[2rem] border border-slate-200 shadow-sm relative overflow-hidden">
+                            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-teal-500"></div>
+                            
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-end">
+                                <div className="md:col-span-6">
+                                    <label className="text-xs font-bold text-slate-500 mb-1.5 block">Tipo de Documento</label>
+                                    <div className="relative">
+                                        <select value={newItem.type} onChange={e => setNewItem({...newItem, type: e.target.value})} className="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 outline-none focus:ring-4 focus:ring-emerald-500/10 appearance-none">
+                                            {DOCUMENT_OPTIONS.map((d, i) => <option key={i} value={d.type}>{d.type}</option>)}
+                                        </select>
+                                        <div className="absolute right-3 top-3.5 pointer-events-none text-slate-400"><ChevronRight size={14} className="rotate-90"/></div>
+                                    </div>
+                                </div>
+
+                                {newItem.type === 'Outros' && (
+                                    <div className="md:col-span-6 animate-in fade-in slide-in-from-left-2">
+                                        <label className="text-xs font-bold text-slate-500 mb-1.5 block">Nome do Documento</label>
+                                        <input className="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 outline-none focus:border-emerald-500" placeholder="Digite o nome..." value={newItem.customName} onChange={e => setNewItem({...newItem, customName: e.target.value})}/>
+                                    </div>
+                                )}
+
+                                <div className="md:col-span-2">
+                                    <label className="text-xs font-bold text-slate-500 mb-1.5 block">Ano</label>
+                                    <input type="number" placeholder="2024" className="w-full p-3 border border-slate-200 rounded-xl text-sm bg-slate-50 outline-none focus:border-emerald-500 text-center font-bold text-slate-700" value={newItem.year} onChange={e => setNewItem({...newItem, year: e.target.value})}/>
+                                </div>
+
+                                <div className="md:col-span-4">
+                                    <input type="file" id="up" className="hidden" onChange={handleFileUpload} disabled={uploading} />
+                                    <label htmlFor="up" className={`flex items-center justify-center gap-2 p-3 border-2 border-dashed rounded-xl cursor-pointer transition-all ${newItem.fileUrl ? "bg-emerald-50 border-emerald-400 text-emerald-700 font-bold" : "bg-slate-50 border-slate-300 hover:bg-slate-100 text-slate-500"}`}>
+                                        {uploading ? <UploadCloud size={18} className="animate-bounce"/> : newItem.fileUrl ? <><CheckCircle size={18}/> Arquivo OK</> : <><UploadCloud size={18}/> Anexar Arquivo</>}
+                                    </label>
+                                </div>
                             </div>
-                            <div>
-                                <div className="font-bold text-slate-700">{item.type}</div>
-                                {item.fileName ? (
-                                    <a href={item.fileUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline flex gap-1 items-center mt-1 font-medium">
-                                        <Paperclip size={12}/> {item.fileName}
-                                    </a>
-                                ) : <span className="text-xs text-slate-400 italic flex items-center gap-1 mt-1"><AlertTriangle size={10}/> Sem anexo</span>}
+
+                            {selectedDocInfo && (
+                                <div className="mt-4 bg-blue-50 p-4 rounded-xl border border-blue-100 flex gap-3 items-start">
+                                    <div className="bg-blue-100 p-2 rounded-lg text-blue-600 shrink-0"><Scale size={16}/></div>
+                                    <div>
+                                        <p className="text-xs font-bold text-blue-800 mb-0.5">{selectedDocInfo.law}</p>
+                                        <p className="text-xs text-blue-600/80 leading-relaxed">{selectedDocInfo.obs}</p>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="flex justify-end mt-6">
+                                <button onClick={handleAddItem} disabled={!newItem.fileUrl} className={`px-8 py-3 rounded-xl font-bold text-sm flex items-center gap-2 transition-all shadow-lg ${newItem.fileUrl ? "bg-slate-900 text-white hover:bg-emerald-600 hover:shadow-emerald-500/20 hover:scale-105" : "bg-slate-200 text-slate-400 cursor-not-allowed"}`}>
+                                    <Plus size={18}/> Adicionar à Lista
+                                </button>
                             </div>
                         </div>
-                        <button onClick={() => handleRemoveItem(item.id)} className="text-slate-300 hover:text-red-500 p-2 rounded-full hover:bg-red-50 transition"><Trash2 size={18}/></button>
+
+                        {/* LISTA DE DOCUMENTOS */}
+                        <div className="grid grid-cols-1 gap-4">
+                            {timeline.length === 0 && (
+                                <div className="text-center py-12 bg-white rounded-[2rem] border-2 border-dashed border-slate-200">
+                                    <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-3 text-slate-300">
+                                        <Paperclip size={24}/>
+                                    </div>
+                                    <p className="text-slate-500 font-medium">Nenhum documento adicionado.</p>
+                                </div>
+                            )}
+                            {timeline.map((item, idx) => (
+                                <div key={item.id || idx} className="bg-white p-4 pr-6 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-5 hover:border-emerald-200 hover:shadow-md transition-all group">
+                                    <div className="w-16 h-16 bg-slate-50 rounded-xl flex flex-col items-center justify-center border border-slate-100 group-hover:bg-emerald-50 group-hover:text-emerald-700 transition-colors">
+                                        <span className="text-[10px] uppercase font-bold text-slate-400 mb-0.5">Ano</span>
+                                        <span className="text-lg font-black text-slate-700">{item.year || "?"}</span>
+                                    </div>
+                                    
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-bold text-slate-800 text-sm truncate">{item.type}</h4>
+                                        {item.fileName && (
+                                            <a href={item.fileUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-xs text-slate-500 hover:text-emerald-600 hover:underline mt-1 transition-colors">
+                                                <Paperclip size={12}/> {item.fileName}
+                                            </a>
+                                        )}
+                                    </div>
+
+                                    <button onClick={() => handleRemoveItem(item.id)} className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all">
+                                        <Trash2 size={20}/>
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                ))}
+                )}
+
             </div>
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }
