@@ -182,7 +182,6 @@ export function DashboardPage() {
                                             <div className="flex gap-2">
                                                 <button onClick={() => navigate(`/analise/${client.id}`)} className="p-2.5 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-500 hover:text-white transition-colors border border-orange-100" title="Calculadora"><Calculator size={18}/></button>
                                                 <button onClick={() => navigate(`/parecer/${client.id}`)} className="p-2.5 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-600 hover:text-white transition-colors border border-purple-100" title="Parecer IA"><BrainCircuit size={18}/></button>
-                                                <button onClick={() => navigate(`/linha-tempo-visual/${client.id}`)} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-100" title="Linha do Tempo"><TrendingUp size={18}/></button>
                                             </div>
                                             <div className="w-px h-8 bg-slate-200 hidden sm:block"></div>
                                             <div className="flex gap-2">

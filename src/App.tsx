@@ -16,7 +16,6 @@ import { AnalysisPage } from './pages/analysis/AnalysisPage';
 import { LegalOpinionPage } from './pages/clients/LegalOpinionPage';
 import { MasterReportPage } from './pages/analysis/MasterReportPage'; // Dossiê
 import { TimelinePage } from './pages/timeline/TimelinePage';
-import { TimelineVisualPage } from './pages/timeline/TimelineVisualPage';
 import { ClientDocumentsManager } from './pages/documents/ClientDocumentsManager';
 import { ProcuracaoPrint } from './pages/documents/ProcuracaoPrint';
 import { DocumentsPage } from './pages/documents/DocumentsPage'; // Editor
@@ -86,7 +85,6 @@ function App() {
 
             {/* Linha do Tempo e Documentos */}
             <Route path="linha-tempo/:id" element={<ClientLoader Component={TimelinePage} />} />
-            <Route path="linha-tempo-visual/:id" element={<ClientLoader Component={TimelineVisualPage} />} />
             <Route path="documentos/:id" element={<ClientLoader Component={ClientDocumentsManager} />} />
 
             {/* Geração de Docs */}
