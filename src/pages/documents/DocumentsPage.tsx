@@ -14,7 +14,7 @@ import { asBlob } from 'html-docx-js-typescript';
 const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
 // MODELOS
-const MODEL_CANDIDATES = ["gemini-2.5-flash", "gemini-3-flash", "gemini-2.0-flash"];
+const MODEL_CANDIDATES = ["gemini-2.0-flash", "gemini-1.5-flash"];
 
 interface DocumentsPageProps {
   cliente: any;

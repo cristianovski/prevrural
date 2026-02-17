@@ -95,7 +95,7 @@ export function MasterReportPage({ cliente, onBack }: ReportProps) {
       setGeneratingSummary(true);
       try {
           const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-          const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+          const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
           let ruralMonths = 0;
           periodsData.forEach(p => { if(p.tipo === 'rural' || p.tipo === 'beneficio') ruralMonths += diffMonths(p.inicio, p.fim); });

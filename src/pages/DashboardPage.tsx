@@ -8,17 +8,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useToast } from "../hooks/use-toast";
-
-interface Client {
-  id: number;
-  nome: string;
-  cpf: string;
-  telefone?: string;
-  honorarios?: number;
-  status_processo?: string;
-  data_nascimento?: string; 
-  created_at: string;
-}
+import { Client } from "../types";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -61,7 +51,7 @@ export function DashboardPage() {
 
   const toggleStatus = async (client: Client) => {
       const ciclo = ["A Iniciar", "Em Andamento", "Finalizado"];
-      const atual = client.status_processo || "A Iniciar";
+      const atual = (client.status_processo as string) || "A Iniciar";
       const novo = ciclo[(ciclo.indexOf(atual) + 1) % ciclo.length];
       
       // Atualização Otimista
@@ -178,7 +168,7 @@ export function DashboardPage() {
                         clientesFiltrados.map(client => {
                             return (
                                 <div key={client.id} className="bg-white rounded-[1.2rem] shadow-sm border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden relative">
-                                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 cursor-pointer hover:w-2.5 transition-all ${getStatusColor(client.status_processo)}`} onClick={() => toggleStatus(client)} title="Alterar Status"></div>
+                                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 cursor-pointer hover:w-2.5 transition-all ${getStatusColor(client.status_processo as string)}`} onClick={() => toggleStatus(client)} title="Alterar Status"></div>
                                     <div className="pl-6 p-6">
                                         <div className="flex justify-between items-start mb-6">
                                             <div><h3 className="font-bold text-xl text-slate-800 tracking-tight">{client.nome}</h3></div>
@@ -192,7 +182,6 @@ export function DashboardPage() {
                                             <div className="flex gap-2">
                                                 <button onClick={() => navigate(`/analise/${client.id}`)} className="p-2.5 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-500 hover:text-white transition-colors border border-orange-100" title="Calculadora"><Calculator size={18}/></button>
                                                 <button onClick={() => navigate(`/parecer/${client.id}`)} className="p-2.5 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-600 hover:text-white transition-colors border border-purple-100" title="Parecer IA"><BrainCircuit size={18}/></button>
-                                                <button onClick={() => navigate(`/linha-tempo-visual/${client.id}`)} className="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-600 hover:text-white transition-colors border border-indigo-100" title="Linha do Tempo"><TrendingUp size={18}/></button>
                                             </div>
                                             <div className="w-px h-8 bg-slate-200 hidden sm:block"></div>
                                             <div className="flex gap-2">
