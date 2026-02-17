@@ -46,11 +46,20 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   
+  // Helper for local date string (YYYY-MM-DD)
+  const getTodayLocal = () => {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   const [uploadMetadata, setUploadMetadata] = useState({ 
     category: "Provas" as ClientDocument['category'], 
     docType: "", 
     customName: "", 
-    date: new Date().toISOString().split('T')[0],
+    date: getTodayLocal(),
     userObs: ""
   });
 
@@ -102,7 +111,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
       category: "Provas",
       docType: "", 
       customName: file.name.split('.')[0], 
-      date: new Date().toISOString().split('T')[0],
+      date: getTodayLocal(),
       userObs: ""
     });
     setIsUploadModalOpen(true);
@@ -206,7 +215,6 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
           setIsEditing(false);
           fetchDocuments();
           
-          // Correção do erro "parameter prev implicitly has any type"
           setSelectedDoc((prev: ClientDocument | null) => prev ? ({ 
               ...prev, 
               title: finalTitle, 
@@ -379,7 +387,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
                                 <div><label className="text-xs font-bold text-slate-600 mb-1 block">Data</label><input type="date" disabled={!isEditing} value={editForm.reference_date} onChange={e => setEditForm({...editForm, reference_date: e.target.value})} className="w-full p-2 border rounded-lg text-sm disabled:bg-slate-50"/></div>
                                 <div>
                                     <label className="text-xs font-bold text-slate-600 mb-1 block">Categoria</label>
-                                    <select disabled={!isEditing} value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value as any})} className="w-full p-2 border rounded-lg text-sm disabled:bg-slate-50">
+                                    <select disabled={!isEditing} value={editForm.category} onChange={e => setEditForm({...editForm, category: e.target.value as ClientDocument['category']})} className="w-full p-2 border rounded-lg text-sm disabled:bg-slate-50">
                                         <option value="Provas">Provas</option>
                                         <option value="Pessoal">Pessoal</option>
                                         <option value="Processual">Processual</option>
@@ -437,7 +445,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
                         {uploadMetadata.docType === "Outros" && <input value={uploadMetadata.customName} onChange={e => setUploadMetadata({...uploadMetadata, customName: e.target.value})} className="w-full mt-2 p-3 border rounded-xl text-sm" placeholder="Nome do arquivo"/>}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Categoria</label><select value={uploadMetadata.category} onChange={e => setUploadMetadata({...uploadMetadata, category: e.target.value as any})} className="w-full p-3 border rounded-xl text-sm"><option value="Provas">Provas</option><option value="Pessoal">Pessoal</option><option value="Diversos">Diversos</option></select></div>
+                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Categoria</label><select value={uploadMetadata.category} onChange={e => setUploadMetadata({...uploadMetadata, category: e.target.value as ClientDocument['category']})} className="w-full p-3 border rounded-xl text-sm"><option value="Provas">Provas</option><option value="Pessoal">Pessoal</option><option value="Diversos">Diversos</option></select></div>
                         <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Data</label><input type="date" value={uploadMetadata.date} onChange={e => setUploadMetadata({...uploadMetadata, date: e.target.value})} className="w-full p-3 border rounded-xl text-sm"/></div>
                     </div>
                     <div>
