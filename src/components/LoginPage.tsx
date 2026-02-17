@@ -1,23 +1,13 @@
-import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "../hooks/useAuth";
+import { useState } from "react";
 import { supabase } from "../lib/supabase";
 import { LayoutDashboard, LogIn, UserPlus, AlertCircle } from "lucide-react";
 
 export function LoginPage() {
-  const navigate = useNavigate();
-  const { session } = useAuth();
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false); // Alternar entre Login e Cadastro
   const [msg, setMsg] = useState("");
-
-  useEffect(() => {
-    if (session) {
-      navigate("/");
-    }
-  }, [session, navigate]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();

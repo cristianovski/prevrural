@@ -5,7 +5,17 @@ import {
   ChevronRight, LayoutList 
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { Client } from "../../types";
+
+interface Client {
+  id: number;
+  nome: string;
+  cpf: string;
+  telefone?: string;
+  endereco?: string;
+  cidade?: string;
+  status_processo?: string;
+  created_at: string;
+}
 
 // Removemos as props antigas (onSelectClient, onNewClient)
 export function ClientListPage() {
@@ -100,7 +110,7 @@ export function ClientListPage() {
                      <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center text-slate-600 font-bold text-xl border border-slate-100 group-hover:bg-emerald-50 group-hover:text-emerald-700 group-hover:border-emerald-100 transition-colors">
                       {client.nome ? client.nome.charAt(0).toUpperCase() : '?'}
                     </div>
-                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border ${getStatusColor(client.status_processo as string)}`}>
+                    <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide border ${getStatusColor(client.status_processo)}`}>
                       {client.status_processo || 'A Iniciar'}
                    </span>
                   </div>

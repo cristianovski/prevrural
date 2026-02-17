@@ -1,16 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Routes, Route, Navigate, useParams } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { Toaster } from './components/ui/toaster';
 
 // Layout e Autenticação
 import { Layout } from './components/Layout';
 import { LoginPage } from './components/LoginPage';
-import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Páginas
 import { DashboardPage } from './pages/DashboardPage';
-import { ClientListPage } from './pages/clients/ClientListPage';
 import { ClientFormPage } from './pages/clients/ClientFormPage';
 import { AnalysisPage } from './pages/analysis/AnalysisPage';
 import { LegalOpinionPage } from './pages/clients/LegalOpinionPage';
@@ -64,32 +62,27 @@ function ClientLoader({ Component }: { Component: any }) {
 }
 
 function App() {
-  return (
-    <>
-      <Routes>
-        <Route path="/login" element={<LoginPage />} />
+  const [session, setSession] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
 
-        <Route element={<ProtectedRoute />}>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<DashboardPage />} />
-            <Route path="clientes" element={<ClientListPage />} />
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setAuthLoading(false);
+    });
 
-            {/* Rotas de Cliente */}
-            <Route path="cliente/novo" element={<ClientFormPage onBack={() => window.history.back()} clienteId={null} />} />
-            <Route path="cliente/:id" element={<ClientLoader Component={ClientFormPage} />} />
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
 
-            {/* Ferramentas Jurídicas */}
-            <Route path="analise/:id" element={<ClientLoader Component={AnalysisPage} />} />
-            <Route path="parecer/:id" element={<ClientLoader Component={LegalOpinionPage} />} />
-            <Route path="dossie/:id" element={<ClientLoader Component={MasterReportPage} />} />
+    return () => subscription.unsubscribe();
+  }, []);
 
-            {/* Linha do Tempo e Documentos */}
-            <Route path="linha-tempo/:id" element={<ClientLoader Component={TimelinePage} />} />
-            <Route path="documentos/:id" element={<ClientLoader Component={ClientDocumentsManager} />} />
+  if (authLoading) return <div className="h-screen flex items-center justify-center bg-slate-900 text-emerald-500 font-bold">Iniciando sistema...</div>;
 
-            {/* Geração de Docs */}
-            <Route path="editor/:id" element={<ClientLoader Component={DocumentsPage} />} />
-            <Route path="procuracao/:id" element={<ClientLoader Component={ProcuracaoPrint} />} />
+  if (!session) {
+    return <LoginPage />;
+  }
 
   return (
     <BrowserRouter>
@@ -124,7 +117,7 @@ function App() {
       </Routes>
       
       <Toaster />
-    </>
+    </BrowserRouter>
   );
 }
 

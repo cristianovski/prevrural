@@ -235,6 +235,9 @@ export function ClientFormPage({ onBack, clienteId }: ClientFormProps) {
                 <button onClick={() => navigate(`/analise/${clienteId}`)} className="hidden md:flex bg-orange-100 text-orange-700 hover:bg-orange-200 px-4 py-2 rounded-lg font-bold text-sm items-center gap-2 transition">
                   <Calculator size={16}/> Calculadora
                 </button>
+                <button onClick={() => navigate(`/linha-tempo-visual/${clienteId}`)} className="hidden md:flex bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-2 rounded-lg font-bold text-sm items-center gap-2 transition">
+                  <TrendingUp size={16}/> Linha Tempo
+                </button>
               </>
             )}
 

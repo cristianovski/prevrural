@@ -4,7 +4,7 @@ export type BenefitStatus = 'A Iniciar' | 'Em Andamento' | 'Finalizado' | 'Suspe
 
 export interface Client {
   id: number;
-  user_id?: string;
+  user_id: string;
   nome: string;
   cpf: string;
   rg?: string;
@@ -25,7 +25,7 @@ export interface Client {
   nit?: string;
   ctps?: string;
   senha_meu_inss?: string;
-  status_processo?: BenefitStatus | string; // Allow string for flexibility
+  status_processo?: BenefitStatus;
   
   // Dados financeiros
   honorarios?: number;
@@ -47,7 +47,7 @@ export interface ClientDocument {
   reference_date?: string | null; // YYYY-MM-DD ou null
   description?: string;
   source_origin?: string;
-  created_at?: string;
+  created_at: string;
 }
 
 export interface Lawyer {
