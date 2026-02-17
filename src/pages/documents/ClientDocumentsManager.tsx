@@ -255,7 +255,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
   };
 
   const filteredDocs = docs.filter(doc => {
-      const matchesSearch = doc.title.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSearch = (doc.title || "").toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFilter = filter === "Todos" || doc.category === filter;
       return matchesSearch && matchesFilter;
   });
