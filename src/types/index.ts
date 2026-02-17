@@ -1,16 +1,14 @@
 // ARQUIVO: src/types/index.ts
 
-// Tipos para status do processo
 export type BenefitStatus = 'A Iniciar' | 'Em Andamento' | 'Finalizado' | 'Suspenso';
 
-// Interface do Cliente (Atualizada)
 export interface Client {
   id: number;
   user_id: string;
   nome: string;
   cpf: string;
   rg?: string;
-  data_nascimento?: string;
+  data_nascimento?: string; // YYYY-MM-DD
   sexo?: 'Masculino' | 'Feminino';
   profissao?: string;
   nacionalidade?: string;
@@ -29,10 +27,10 @@ export interface Client {
   senha_meu_inss?: string;
   status_processo?: BenefitStatus;
   
-  // Financeiro
+  // Dados financeiros
   honorarios?: number;
   
-  // Legado (opcional, pois migramos)
+  // Array legado (apenas para leitura se necessário)
   personal_docs?: any[];
   
   // Sistema
@@ -40,20 +38,18 @@ export interface Client {
   updated_at?: string;
 }
 
-// --- NOVA INTERFACE PARA O GED (Essencial para corrigir o erro 'any') ---
 export interface ClientDocument {
-  id: string; // UUID vindo do banco
+  id: string; // UUID
   client_id: number;
   title: string;
   category: 'Provas' | 'Pessoal' | 'Processual' | 'Diversos';
   file_url: string;
-  reference_date?: string | null;
+  reference_date?: string | null; // YYYY-MM-DD ou null
   description?: string;
   source_origin?: string;
   created_at: string;
 }
 
-// Interface para Advogados
 export interface Lawyer {
   id: number;
   nome: string;
@@ -63,7 +59,6 @@ export interface Lawyer {
   estado_civil: string;
 }
 
-// Interface para Teses
 export interface Thesis {
   id: number;
   title: string;

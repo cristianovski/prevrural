@@ -155,8 +155,9 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
     let minTs = new Date(derDate).getTime();
     selectedItems.forEach(item => {
         if (item.periodoInicio) {
-            constHS = new Date(item.periodoInicio).getTime();
-            if (constHS < minTs) minTs = constHS;
+            // CORREÇÃO: Erro de digitação 'constHS' corrigido para 'ts'
+            const ts = new Date(item.periodoInicio).getTime();
+            if (ts < minTs) minTs = ts;
         }
     });
 

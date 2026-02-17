@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useToast } from "../../hooks/use-toast";
-import { Client, ClientDocument } from "../../types"; // Importando os novos tipos
+import { Client, ClientDocument } from "../../types"; 
 
 // Base jurídica
 const LEGAL_BASIS: Record<string, { law: string, obs: string }> = {
@@ -206,7 +206,8 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
           setIsEditing(false);
           fetchDocuments();
           
-          setSelectedDoc(prev => prev ? ({ 
+          // Correção do erro "parameter prev implicitly has any type"
+          setSelectedDoc((prev: ClientDocument | null) => prev ? ({ 
               ...prev, 
               title: finalTitle, 
               category: editForm.category,
