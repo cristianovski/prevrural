@@ -255,8 +255,13 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
   };
 
   const filteredDocs = docs.filter(doc => {
-      const matchesSearch = (doc.title || "").toLowerCase().includes(searchTerm.toLowerCase());
+      // FIX: Garante que title seja uma string vazia se for null/undefined
+      const title = doc.title || "";
+      const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Filtro de categoria
       const matchesFilter = filter === "Todos" || doc.category === filter;
+
       return matchesSearch && matchesFilter;
   });
 
