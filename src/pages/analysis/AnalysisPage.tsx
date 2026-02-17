@@ -91,9 +91,8 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
   const loadAllData = async () => {
     setLoading(true);
     let docsColetados: any[] = [];
-
     try {
-        // 1. BUSCAR DADOS
+        // 1. BUSCAR DADOS DA ENTREVISTA (Mantém igual)
         const { data: interviewData } = await supabase
           .from('interviews')
           .select('analise_periodos, data_der, timeline_json, tipo_beneficio, analise_params')
@@ -119,6 +118,7 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
             }
         }
 
+        // 2. BUSCAR LEGADO DO CADASTRO (Mantém igual - para compatibilidade)
         const { data: clientData } = await supabase.from('clients').select('personal_docs').eq('id', cliente.id).single();
         if (clientData?.personal_docs) {
             const docsUpload = clientData.personal_docs.map((doc: any, idx: number) => ({
@@ -127,13 +127,30 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
                 issueDate: doc.issueDate || 'S/D',
                 displayYear: doc.issueDate ? doc.issueDate.split('-')[0] : 'S/D',
                 fileUrl: doc.url,
-                origem: 'GED / Cadastro'
+                origem: 'Legado (JSON)'
             }));
             docsColetados = [...docsColetados, ...docsUpload];
         }
 
-        setDocumentos(docsColetados.sort((a, b) => new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime()));
+        // 3. BUSCAR DA NOVA TABELA RELACIONAL (CORREÇÃO)
+        const { data: newDocs } = await supabase
+            .from('client_documents')
+            .select('*')
+            .eq('client_id', cliente.id);
 
+        if (newDocs) {
+            const docsRelacionais = newDocs.map((doc: any) => ({
+                id: doc.id,
+                type: doc.title, // Mapeia o título para o tipo visualizado
+                issueDate: doc.reference_date || doc.created_at,
+                displayYear: new Date(doc.reference_date || doc.created_at).getFullYear(),
+                fileUrl: doc.file_url,
+                origem: 'GED (Novo)'
+            }));
+            docsColetados = [...docsColetados, ...docsRelacionais];
+        }
+
+        setDocumentos(docsColetados.sort((a, b) => new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime()));
     } catch (error) {
         console.error(error);
     } finally {
