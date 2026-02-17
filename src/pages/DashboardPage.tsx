@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { 
   Plus, Search, Filter, DollarSign, StickyNote, 
   Trash2, UserCog, MessageCircle, Calculator, 
-  BrainCircuit, TrendingUp, FolderOpen, Printer, 
+  BrainCircuit, FolderOpen, Printer,
   BookCheck, Cake, Users
 } from "lucide-react";
 import { supabase } from "../lib/supabase";

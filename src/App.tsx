@@ -91,10 +91,32 @@ function App() {
             <Route path="editor/:id" element={<ClientLoader Component={DocumentsPage} />} />
             <Route path="procuracao/:id" element={<ClientLoader Component={ProcuracaoPrint} />} />
 
-            {/* Admin */}
-            <Route path="biblioteca" element={<LibraryPage onBack={() => window.history.back()} />} />
-            <Route path="advogados" element={<LawyersPage onBack={() => window.history.back()} />} />
-          </Route>
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Layout />}>
+          <Route index element={<DashboardPage />} />
+          
+          {/* Rotas de Cliente */}
+          <Route path="cliente/novo" element={<ClientFormPage onBack={() => window.history.back()} clienteId={null} />} />
+          <Route path="cliente/:id" element={<ClientLoader Component={ClientFormPage} />} />
+          
+          {/* Ferramentas Jurídicas */}
+          <Route path="analise/:id" element={<ClientLoader Component={AnalysisPage} />} />
+          <Route path="parecer/:id" element={<ClientLoader Component={LegalOpinionPage} />} />
+          <Route path="dossie/:id" element={<ClientLoader Component={MasterReportPage} />} />
+          
+          {/* Linha do Tempo e Documentos */}
+          <Route path="linha-tempo/:id" element={<ClientLoader Component={TimelinePage} />} />
+          <Route path="documentos/:id" element={<ClientLoader Component={ClientDocumentsManager} />} />
+          
+          {/* Geração de Docs */}
+          <Route path="editor/:id" element={<ClientLoader Component={DocumentsPage} />} />
+          <Route path="procuracao/:id" element={<ClientLoader Component={ProcuracaoPrint} />} />
+          
+          {/* Admin */}
+          <Route path="biblioteca" element={<LibraryPage onBack={() => window.history.back()} />} />
+          <Route path="advogados" element={<LawyersPage onBack={() => window.history.back()} />} />
         </Route>
         
         {/* Redirecionamento padrão */}
