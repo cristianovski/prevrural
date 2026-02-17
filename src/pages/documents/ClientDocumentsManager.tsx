@@ -73,7 +73,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
   const fetchDocuments = async () => {
     setLoading(true);
     try {
-      // Agora buscamos apenas na tabela relacional, pois os dados antigos já foram migrados
+      // Agora buscamos apenas na tabela relacional (client_documents), pois os dados antigos já foram migrados
       const { data, error } = await supabase
         .from('client_documents')
         .select('*')
@@ -136,7 +136,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
             .from('evidence-files')
             .getPublicUrl(fileName);
 
-        // 2. Insert na tabela Relacional
+        // 2. Insert na tabela Relacional (client_documents)
         const { error: dbError } = await supabase
             .from('client_documents')
             .insert({
