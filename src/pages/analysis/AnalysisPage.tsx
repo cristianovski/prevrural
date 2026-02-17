@@ -92,7 +92,7 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
     setLoading(true);
     let docsColetados: any[] = [];
     try {
-        // 1. BUSCAR DADOS DA ENTREVISTA (Mantém igual)
+        // 1. BUSCAR DADOS DA ENTREVISTA
         const { data: interviewData } = await supabase
           .from('interviews')
           .select('analise_periodos, data_der, timeline_json, tipo_beneficio, analise_params')
@@ -118,7 +118,7 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
             }
         }
 
-        // 2. BUSCAR LEGADO DO CADASTRO (Mantém igual - para compatibilidade)
+        // 2. BUSCAR LEGADO DO CADASTRO (JSON)
         const { data: clientData } = await supabase.from('clients').select('personal_docs').eq('id', cliente.id).single();
         if (clientData?.personal_docs) {
             const docsUpload = clientData.personal_docs.map((doc: any, idx: number) => ({
@@ -132,7 +132,7 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
             docsColetados = [...docsColetados, ...docsUpload];
         }
 
-        // 3. BUSCAR DA NOVA TABELA RELACIONAL (CORREÇÃO)
+        // 3. BUSCAR DA NOVA TABELA RELACIONAL (FIX IMPLEMENTADO)
         const { data: newDocs } = await supabase
             .from('client_documents')
             .select('*')
@@ -141,7 +141,7 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
         if (newDocs) {
             const docsRelacionais = newDocs.map((doc: any) => ({
                 id: doc.id,
-                type: doc.title, // Mapeia o título para o tipo visualizado
+                type: doc.title || "Sem Título",
                 issueDate: doc.reference_date || doc.created_at,
                 displayYear: new Date(doc.reference_date || doc.created_at).getFullYear(),
                 fileUrl: doc.file_url,
