@@ -301,6 +301,36 @@ export function ClientFormPage({ onBack, clienteId }: ClientFormProps) {
                                 <label htmlFor="analfabeto" className={`text-sm font-bold cursor-pointer select-none flex items-center gap-2 ${formData.analfabeto ? 'text-amber-800' : 'text-slate-600'}`}><PenTool size={16}/> Não Assina / Analfabeto</label>
                             </div>
                         </div>
+
+                        {/* NOVOS CAMPOS - DADOS CIVIS */}
+                        <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">RG</label><input name="rg" value={formData.rg} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500"/></div>
+                        <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Órgão Expedidor</label><input name="orgao_expedidor" value={formData.orgao_expedidor} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500"/></div>
+                        <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Data de Expedição</label><input type="date" name="data_expedicao" value={formData.data_expedicao} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500"/></div>
+
+                        <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Nome da Mãe</label><input name="nome_mae" value={formData.nome_mae} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500"/></div>
+                        <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Nome do Pai</label><input name="nome_pai" value={formData.nome_pai} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500"/></div>
+
+                        <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">NIT / PIS</label><input name="nit" value={formData.nit} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500"/></div>
+                        <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">CTPS (Número/Série)</label><input name="ctps" value={formData.ctps} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500"/></div>
+                        <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Senha Meu INSS</label><input name="senha_meu_inss" value={formData.senha_meu_inss} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500"/></div>
+
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase ml-1">Estado Civil</label>
+                            <select name="estado_civil" value={formData.estado_civil} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500 bg-white">
+                                <option value="Solteiro(a)">Solteiro(a)</option>
+                                <option value="Casado(a)">Casado(a)</option>
+                                <option value="Divorciado(a)">Divorciado(a)</option>
+                                <option value="Viúvo(a)">Viúvo(a)</option>
+                                <option value="União Estável">União Estável</option>
+                            </select>
+                        </div>
+
+                        {(formData.estado_civil === "Casado(a)" || formData.estado_civil === "União Estável") && (
+                            <>
+                                <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Nome do Cônjuge</label><input name="nome_conjuge" value={formData.nome_conjuge} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500"/></div>
+                                <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">CPF do Cônjuge</label><input name="cpf_conjuge" value={formData.cpf_conjuge} onChange={handleCivilChange} maxLength={14} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-emerald-500"/></div>
+                            </>
+                        )}
                     </div>
                 </section>
 
@@ -326,6 +356,51 @@ export function ClientFormPage({ onBack, clienteId }: ClientFormProps) {
                         <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Bairro</label><input name="bairro" value={formData.bairro} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-orange-500"/></div>
                         <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Cidade - UF</label><input name="cidade" value={formData.cidade} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-orange-500"/></div>
                         <div><label className="text-xs font-bold text-slate-500 uppercase ml-1 flex items-center gap-1"><Phone size={12}/> Telefone</label><input name="telefone" value={formData.telefone} onChange={handleCivilChange} maxLength={15} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-orange-500"/></div>
+                    </div>
+                </section>
+
+                <section className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h2 className="text-lg font-bold text-slate-700 mb-6 flex items-center gap-2 border-b pb-2"><TrendingUp className="text-indigo-500"/> 5. Análise & Check</h2>
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Resumo CNIS</label><textarea name="resumo_cnis" rows={4} value={formData.resumo_cnis} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-indigo-500"/></div>
+                            <div><label className="text-xs font-bold text-slate-500 uppercase ml-1">Histórico de Benefícios</label><textarea name="historico_beneficios" rows={4} value={formData.historico_beneficios} onChange={handleCivilChange} className="w-full border border-slate-300 rounded-lg p-3 text-sm outline-none focus:border-indigo-500"/></div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t">
+                             {/* CNPJ */}
+                             <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <input type="checkbox" id="possui_cnpj" name="possui_cnpj" checked={formData.possui_cnpj} onChange={handleCivilChange} className="w-4 h-4 text-indigo-600 rounded"/>
+                                    <label htmlFor="possui_cnpj" className="text-sm font-bold text-slate-700">Possui CNPJ Ativo?</label>
+                                </div>
+                                {formData.possui_cnpj && (
+                                    <input name="detalhes_cnpj" value={formData.detalhes_cnpj} onChange={handleCivilChange} placeholder="Detalhes do CNPJ" className="w-full border border-slate-300 rounded-lg p-2 text-sm"/>
+                                )}
+                             </div>
+
+                             {/* RENDA */}
+                             <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <input type="checkbox" id="possui_outra_renda" name="possui_outra_renda" checked={formData.possui_outra_renda} onChange={handleCivilChange} className="w-4 h-4 text-indigo-600 rounded"/>
+                                    <label htmlFor="possui_outra_renda" className="text-sm font-bold text-slate-700">Possui Outra Renda?</label>
+                                </div>
+                                {formData.possui_outra_renda && (
+                                    <input name="detalhes_renda" value={formData.detalhes_renda} onChange={handleCivilChange} placeholder="Qual a fonte?" className="w-full border border-slate-300 rounded-lg p-2 text-sm"/>
+                                )}
+                             </div>
+
+                             {/* ENDEREÇO DIVERGENTE */}
+                             <div className="space-y-2">
+                                <div className="flex items-center gap-2">
+                                    <input type="checkbox" id="endereco_divergente" name="endereco_divergente" checked={formData.endereco_divergente} onChange={handleCivilChange} className="w-4 h-4 text-indigo-600 rounded"/>
+                                    <label htmlFor="endereco_divergente" className="text-sm font-bold text-slate-700">Endereço Divergente?</label>
+                                </div>
+                                {formData.endereco_divergente && (
+                                    <input name="justificativa_endereco" value={formData.justificativa_endereco} onChange={handleCivilChange} placeholder="Justificativa" className="w-full border border-slate-300 rounded-lg p-2 text-sm"/>
+                                )}
+                             </div>
+                        </div>
                     </div>
                 </section>
             </div>
@@ -357,6 +432,13 @@ export function ClientFormPage({ onBack, clienteId }: ClientFormProps) {
                                 </div>
                             </div>
                         </div>
+
+                        {/* DADOS DO PROPRIETÁRIO */}
+                        <div className="col-span-1 md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">Nome do Proprietário (Se não for)</label><input name="outorgante_nome" value={ruralData.outorgante_nome} onChange={handleRuralChange} className="w-full p-3 border rounded-lg text-sm bg-white"/></div>
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">CPF do Proprietário</label><input name="outorgante_cpf" value={ruralData.outorgante_cpf} onChange={handleRuralChange} maxLength={14} className="w-full p-3 border rounded-lg text-sm bg-white"/></div>
+                        </div>
+
                      </div>
                 </div>
 
@@ -364,7 +446,29 @@ export function ClientFormPage({ onBack, clienteId }: ClientFormProps) {
                     <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2 border-b pb-2"><ShoppingBag size={20} className="text-emerald-500"/> Produção & Família</h3>
                     <div className="space-y-4">
                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">O que produz/cria?</label><textarea name="culturas" rows={2} value={ruralData.culturas} onChange={handleRuralChange} className="w-full p-3 border rounded-lg text-sm"/></div>
+                        <div><label className="text-xs font-bold text-slate-500 mb-1 block">Locais de Venda</label><input name="locais_venda" value={ruralData.locais_venda} onChange={handleRuralChange} className="w-full p-3 border rounded-lg text-sm"/></div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <label className="text-xs font-bold text-slate-500 mb-1 block">Tem Empregados?</label>
+                                <select name="tem_empregados" value={ruralData.tem_empregados} onChange={handleRuralChange} className="w-full p-3 border rounded-lg text-sm">
+                                    <option value="nao">Não</option>
+                                    <option value="sim">Sim</option>
+                                </select>
+                            </div>
+                            <div><label className="text-xs font-bold text-slate-500 mb-1 block">Tempo com Empregados?</label><input name="tempo_empregados" value={ruralData.tempo_empregados} onChange={handleRuralChange} className="w-full p-3 border rounded-lg text-sm"/></div>
+                        </div>
+
                         <div><label className="text-xs font-bold text-slate-500 mb-1 block">Grupo Familiar (Quem ajuda?)</label><textarea name="grupo_familiar" rows={2} value={ruralData.grupo_familiar} onChange={handleRuralChange} className="w-full p-3 border rounded-lg text-sm"/></div>
+                    </div>
+                </div>
+
+                {/* NARRATIVA */}
+                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2 border-b pb-2"><PenTool size={20} className="text-emerald-500"/> Narrativa Rural</h3>
+                    <div>
+                        <label className="text-xs font-bold text-slate-500 mb-1 block">Histórico de Locais / Narrativa</label>
+                        <textarea rows={6} value={historico} onChange={(e) => setHistorico(e.target.value)} className="w-full p-3 border rounded-lg text-sm outline-none focus:border-emerald-500" placeholder="Descreva a história rural do cliente..."/>
                     </div>
                 </div>
             </div>
