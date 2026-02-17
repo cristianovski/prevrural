@@ -1,3 +1,4 @@
+// JULES_WRITE_TEST_V1: O sistema esta gravando arquivos corretamente.
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { supabase } from './lib/supabase';
