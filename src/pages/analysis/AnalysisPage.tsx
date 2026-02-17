@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
-import { 
-  ArrowLeft, Save, Calculator, Plus, Trash2, 
+import {
+  ArrowLeft, Save, Calculator, Plus, Trash2,
   AlertTriangle, CheckCircle, XCircle, Calendar,
-  HelpCircle, Paperclip, Eye, Edit2, Link as LinkIcon, X, Scale, 
+  HelpCircle, Paperclip, Eye, Edit2, Link as LinkIcon, X, Scale,
   ChevronDown, Activity, Heart, FileText, Folder
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { analisarViabilidade, AnalysisResult, ClientData } from "../../utils/benefitRules";
-import { useToast } from "../../hooks/use-toast"; // Novo Hook
+import { useToast } from "../../hooks/use-toast";
 
 // --- LISTA DE FUNDAMENTAÇÕES ---
 const DOCUMENT_OPTIONS = [
@@ -23,7 +23,7 @@ const BENEFIT_TYPES = [
   "Aposentadoria por Idade Rural",
   "Salário Maternidade Rural",
   "Aposentadoria Híbrida",
-  "Auxílio por incapacidade temporária", 
+  "Auxílio por incapacidade temporária",
   "Auxílio por incapacidade permanente",
   "Pensão por morte"
 ];
@@ -44,17 +44,16 @@ interface Periodo {
   is_safra?: boolean;
   linkedDocId?: string;
   linkedDocTitle?: string;
-  law?: string; 
+  law?: string;
 }
 
 export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [der, setDer] = useState(new Date().toISOString().split('T')[0]); 
+  const [der, setDer] = useState(new Date().toISOString().split('T')[0]);
   const [selectedBenefit, setSelectedBenefit] = useState(BENEFIT_TYPES[0]);
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
   const [documentos, setDocumentos] = useState<any[]>([]);
-
   const [extraParams, setExtraParams] = useState({
     data_dii: "",
     is_acidente: false,
@@ -103,22 +102,22 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
             if (interviewData.analise_periodos) setPeriodos(interviewData.analise_periodos);
             if (interviewData.data_der) setDer(interviewData.data_der);
             if (interviewData.tipo_beneficio) setSelectedBenefit(interviewData.tipo_beneficio);
-            if (interviewData.analise_params) setExtraParams(interviewData.analise_params); 
-            
+            if (interviewData.analise_params) setExtraParams(interviewData.analise_params);
+
             if (interviewData.timeline_json && Array.isArray(interviewData.timeline_json)) {
                 const docsDaFicha = interviewData.timeline_json.map((doc: any) => ({
                     id: doc.id || Math.random().toString(),
                     type: doc.type || "Documento Ficha",
-                    issueDate: doc.issueDate || (doc.year ? `${doc.year}-01-01` : 'S/D'), 
+                    issueDate: doc.issueDate || (doc.year ? `${doc.year}-01-01` : 'S/D'),
                     displayYear: doc.issueDate ? doc.issueDate.split('-')[0] : doc.year,
-                    fileUrl: doc.fileUrl || null, 
+                    fileUrl: doc.fileUrl || null,
                     origem: 'Ficha de Entrevista'
                 }));
                 docsColetados = [...docsColetados, ...docsDaFicha];
             }
         }
 
-        // 2. BUSCAR LEGADO DO CADASTRO (Mantém igual - para compatibilidade)
+        // 2. BUSCAR LEGADO DO CADASTRO (Mantém igual - JSON)
         const { data: clientData } = await supabase.from('clients').select('personal_docs').eq('id', cliente.id).single();
         if (clientData?.personal_docs) {
             const docsUpload = clientData.personal_docs.map((doc: any, idx: number) => ({
@@ -152,7 +151,8 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
 
         setDocumentos(docsColetados.sort((a, b) => new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime()));
     } catch (error) {
-        console.error(error);
+        console.error("Erro ao carregar dados:", error);
+        toast({ title: "Erro", description: "Falha ao carregar dados.", variant: "destructive" });
     } finally {
         setLoading(false);
     }
@@ -172,7 +172,7 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
     const date1 = new Date(d1);
     const date2 = new Date(d2);
     const diffTime = Math.abs(date2.getTime() - date1.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1; 
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
   };
 
   const calcularTotais = () => {
@@ -182,9 +182,8 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
         const meses = diffMonths(p.inicio, p.fim);
         if (p.tipo === 'rural') rural += meses;
         else if (p.tipo === 'urbano') {
-            // Em tese, safra não conta carência urbana comum, mas conta tempo. Simplificado aqui.
             if (p.is_safra) urbano += meses; else urbano += meses;
-        } else if (p.tipo === 'beneficio') rural += meses; // Benefício intercalado conta
+        } else if (p.tipo === 'beneficio') rural += meses;
     });
     setTotalRural(rural);
     setTotalHibrido(rural + urbano);
@@ -195,13 +194,13 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
           sexo: cliente.sexo || 'Masculino',
           data_nascimento: cliente.data_nascimento,
           profissao: cliente.profissao || 'Rural',
-          tempo_rural_anos: totalRural / 12, 
+          tempo_rural_anos: totalRural / 12,
           tempo_urbano_anos: (totalHibrido - totalRural) / 12,
           possui_cnpj: cliente.possui_cnpj,
           possui_outra_renda: cliente.possui_outra_renda,
-          ...extraParams 
+          ...extraParams
       };
-      // Aqui usamos a função utilitária que você já tem
+
       const resultado = analisarViabilidade(selectedBenefit, clientData);
       setAnaliseJuridica(resultado);
   };
@@ -286,7 +285,7 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
                     <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded">{cliente.nome}</span>
                     <span className="text-slate-300">|</span>
                     <div className="relative group">
-                        <select value={selectedBenefit} onChange={(e) => setSelectedBenefit(e.target.value)} className="appearance-none bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold py-1 pl-2 pr-8 rounded cursor-pointer outline-none border border-emerald-200 transition-colors">
+                         <select value={selectedBenefit} onChange={(e) => setSelectedBenefit(e.target.value)} className="appearance-none bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold py-1 pl-2 pr-8 rounded cursor-pointer outline-none border border-emerald-200 transition-colors">
                              {BENEFIT_TYPES.map(opt => (<option key={opt} value={opt}>{opt}</option>))}
                         </select>
                         <ChevronDown size={14} className="absolute right-2 top-1.5 text-emerald-600 pointer-events-none"/>
@@ -301,7 +300,7 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
 
       <main className="flex-1 overflow-hidden flex flex-col md:flex-row">
         <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-center">
                     <label className="text-xs font-bold text-slate-500 mb-1">Data do Requerimento (DER)</label>
@@ -322,7 +321,7 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
                 </div>
             </div>
 
-            {/* SEÇÃO DE INPUT DE DII/ACIDENTE/PENSÃO - MANTIDA IGUAL */}
+            {/* SEÇÃO DE INPUT DE DII/ACIDENTE/PENSÃO */}
             {(showDII || showPensao) && (
                 <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 shadow-sm animate-in fade-in slide-in-from-top-4">
                     <h3 className="font-bold text-blue-800 mb-4 flex items-center gap-2 text-sm">{showDII ? <Activity size={16}/> : <Heart size={16}/>} Parâmetros Específicos: {selectedBenefit}</h3>
@@ -403,10 +402,10 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
                 {periodos.map((p) => {
                     const meses = diffMonths(p.inicio, p.fim);
                     let bgColor = "bg-white", borderColor = "border-slate-200", icon = <Calendar size={18} className="text-slate-400"/>, statusText = "";
-                    if (p.tipo === 'rural') { bgColor = "bg-emerald-50"; borderColor = "border-emerald-200"; icon = <CheckCircle size={18} className="text-emerald-600"/>; statusText = "Conta como Carência"; } 
+                    if (p.tipo === 'rural') { bgColor = "bg-emerald-50"; borderColor = "border-emerald-200"; icon = <CheckCircle size={18} className="text-emerald-600"/>; statusText = "Conta como Carência"; }
                     else if (p.tipo === 'urbano') { bgColor = "bg-red-50"; borderColor = "border-red-200"; icon = <XCircle size={18} className="text-red-600"/>; statusText = "Interrupção (>120 dias)"; }
                     else if (p.tipo === 'beneficio') { bgColor = "bg-blue-50"; borderColor = "border-blue-200"; icon = <HelpCircle size={18} className="text-blue-600"/>; statusText = "Benefício Intercalado (Conta Carência)"; }
-                    
+
                     return (
                         <div key={p.id} className={`p-4 rounded-xl border ${bgColor} ${borderColor} shadow-sm transition-all hover:shadow-md relative group`}>
                             <div className="flex justify-between items-start">
@@ -430,7 +429,9 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
         {/* PAINEL LATERAL DE DOCUMENTOS (Somente Visualização) */}
         <div className="w-full md:w-80 bg-slate-100 border-l border-slate-200 p-4 overflow-y-auto hidden md:block">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2"><Paperclip size={14}/> Documentos Disponíveis</h3>
-            {documentos.length === 0 ? (<div className="text-center py-10 text-slate-400 text-xs">Nenhum documento.</div>) : (
+            {documentos.length === 0 ? (
+                <div className="text-center py-10 text-slate-400 text-xs">Nenhum documento.</div>
+            ) : (
                 <div className="space-y-3">
                     {documentos.map((doc: any, i) => (
                         <div key={`${doc.id}-${i}`} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-blue-300 transition-colors group">
