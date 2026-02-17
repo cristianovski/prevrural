@@ -2,11 +2,11 @@ import { useState, useEffect } from "react";
 import { 
   ArrowLeft, Printer, Scale, 
   Plus, Trash2, Wand2, Save, Eye,
-  Lock, LockOpen, ArrowRight, ArrowLeft as ArrowLeftIcon
+  Lock, LockOpen, ArrowRight, ArrowLeft as ArrowLeftIcon, FileText, Folder
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
-// --- BASE DE DADOS JURÍDICA (MANTIDA) ---
+// --- BASE DE DADOS JURÍDICA ---
 const DOCUMENT_OPTIONS = [
   { type: "Autodeclaração do Segurado Especial", law: "Lei 8.213/91, Art. 38-B, § 2º; IN 128/2022, Art. 115" },
   { type: "Bloco de Notas do Produtor Rural", law: "Lei 8.213/91, Art. 106, V; IN 128/2022, Art. 116, III" },
@@ -61,7 +61,7 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
 
   useEffect(() => {
     if (cliente?.id) {
-        loadDocs();
+        loadUnifiedDocs();
         loadSavedChart();
     }
   }, [cliente]);
@@ -71,15 +71,60 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
     calculateTotalMonths();
   }, [selectedItems, derDate]);
 
-  const loadDocs = async () => {
-    const { data } = await supabase
-      .from('interviews')
-      .select('timeline_json')
-      .eq('client_id', cliente.id)
-      .maybeSingle();
+  const loadUnifiedDocs = async () => {
+    let combined: any[] = [];
+    
+    try {
+        // 1. FICHA ANTIGA
+        const { data: interview } = await supabase
+          .from('interviews')
+          .select('timeline_json')
+          .eq('client_id', cliente.id)
+          .maybeSingle();
+        
+        if (interview?.timeline_json) {
+            combined = [...combined, ...interview.timeline_json.map((d: any) => ({
+                ...d,
+                normalizedDate: d.issueDate || (d.year ? `${d.year}-01-01` : null),
+                sourceLabel: 'Ficha Antiga'
+            }))];
+        }
 
-    if (data && Array.isArray(data.timeline_json)) {
-        setAvailableDocs(data.timeline_json);
+        // 2. GED / CADASTRO
+        const { data: clientData } = await supabase
+          .from('clients')
+          .select('personal_docs')
+          .eq('id', cliente.id)
+          .single();
+
+        if (clientData?.personal_docs) {
+            combined = [...combined, ...clientData.personal_docs.map((d: any) => ({
+                type: d.name || d.category,
+                fileUrl: d.url,
+                normalizedDate: d.issueDate,
+                sourceLabel: 'GED'
+            }))];
+        }
+
+        // 3. TABELA NOVA (Futuro)
+        const { data: newDocs } = await supabase.from('client_documents').select('*').eq('client_id', cliente.id);
+        if (newDocs) {
+            combined = [...combined, ...newDocs.map((d: any) => ({
+                type: d.original_name,
+                fileUrl: d.file_url,
+                normalizedDate: d.reference_date,
+                sourceLabel: 'GED Novo'
+            }))];
+        }
+
+        // Filtra sem data e ordena
+        const validDocs = combined
+            .filter(d => d.normalizedDate)
+            .sort((a, b) => new Date(a.normalizedDate).getTime() - new Date(b.normalizedDate).getTime());
+
+        setAvailableDocs(validDocs);
+    } catch (e) {
+        console.error("Erro carregando docs unificados:", e);
     }
   };
 
@@ -110,8 +155,8 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
     let minTs = new Date(derDate).getTime();
     selectedItems.forEach(item => {
         if (item.periodoInicio) {
-            const ts = new Date(item.periodoInicio).getTime();
-            if (ts < minTs) minTs = ts;
+            constHS = new Date(item.periodoInicio).getTime();
+            if (constHS < minTs) minTs = constHS;
         }
     });
 
@@ -136,13 +181,12 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
   };
 
   const handleAddItem = (docBase: any) => {
-    // ✅ CORREÇÃO: Obtém a data do novo campo issueDate ou fallback para o year antigo
-    const baseDate = docBase.issueDate || `${docBase.year}-01-01`;
+    const baseDate = docBase.normalizedDate;
     const baseYear = baseDate.split('-')[0];
 
     const newItem = {
         id: Math.random().toString(36).substr(2, 9),
-        nome: docBase.type, 
+        nome: docBase.type || "Documento", 
         tipo: 'Rural', 
         fundamento: getLegalBasis(docBase.type), 
         dataExpedicao: baseDate, 
@@ -234,12 +278,6 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
     return `${dia}/${mes}/${ano}`;
   };
 
-  // Helper para exibir ano na sidebar
-  const getYearFromDoc = (doc: any) => {
-      if (doc.issueDate) return doc.issueDate.split('-')[0];
-      return doc.year || "?";
-  };
-
   const renderRuler = () => {
     const years = [];
     const startYear = minDate.getFullYear();
@@ -269,7 +307,7 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
       <header className="bg-white border-b border-slate-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50 print:hidden shadow-sm">
         <div className="flex items-center gap-4">
             <button onClick={onBack} className="p-2 hover:bg-slate-100 rounded-xl transition text-slate-500 hover:text-emerald-600 border border-transparent hover:border-emerald-100">
-                <ArrowLeft size={20}/>
+                 <ArrowLeft size={20}/>
             </button>
             <div>
                 <h1 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -304,26 +342,27 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
             </div>
 
             <div className="mb-8">
-                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">2. Adicione Documentos</label>
+                <label className="text-xs font-bold text-slate-500 uppercase mb-2 block">2. Adicione Documentos do GED</label>
                 <div className="flex gap-2 mb-2">
                      <select id="docSelect" className="flex-1 p-3 border border-slate-200 rounded-xl text-sm bg-white outline-none focus:ring-2 focus:ring-emerald-500/20">
                         <option value="">Selecione da lista...</option>
                         {availableDocs.map((doc, i) => (
-                            // ✅ CORREÇÃO: Mostra o ano extraído da issueDate
-                            <option key={i} value={i}>{getYearFromDoc(doc)} - {doc.type}</option>
+                            <option key={i} value={i}>
+                                [{doc.sourceLabel}] {doc.normalizedDate.split('-')[0]} - {doc.type}
+                            </option>
                         ))}
                      </select>
-                     <button 
+                    <button 
                         onClick={() => {
                             const select = document.getElementById('docSelect') as HTMLSelectElement;
                             if (select.value !== "") handleAddItem(availableDocs[parseInt(select.value)]);
                         }}
                         className="bg-emerald-500 text-white px-4 rounded-xl hover:bg-emerald-600 transition-colors shadow-sm"
-                     >
+                    >
                         <Plus size={20}/>
                      </button>
                 </div>
-                <p className="text-[10px] text-slate-400 pl-1">Apenas provas cadastradas na entrevista aparecem aqui.</p>
+                <p className="text-[10px] text-slate-400 pl-1">Adicione provas no GED antes de usar aqui.</p>
             </div>
 
             <div className="space-y-4 pb-20">
@@ -361,7 +400,6 @@ export function TimelineVisualPage({ cliente, onBack }: TimelineVisualPageProps)
                             <div className="p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
                                 <div className="flex justify-between items-center mb-2">
                                     <label className="text-[10px] font-bold text-emerald-800 block uppercase">Período de Eficácia</label>
-                                    
                                     <button onClick={() => applyMagicPeriod(idx)} className="text-[10px] bg-emerald-600 text-white px-3 py-1.5 rounded-lg flex items-center gap-1.5 hover:bg-emerald-700 font-bold shadow-sm transition-all active:scale-95 border border-emerald-700">
                                         <Wand2 size={10}/> 
                                         {item.anchor === 'end' ? 'Projetar Início (-90m)' : 'Projetar Fim (+90m)'}

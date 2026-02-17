@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { 
   ArrowLeft, Calendar, Search, AlertCircle, 
-  Paperclip, Download, ExternalLink, Clock
+  Paperclip, ExternalLink, Clock, FileText, Folder
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 
@@ -16,29 +16,88 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
   const [filter, setFilter] = useState("");
 
   useEffect(() => {
-    if (cliente?.id) loadTimeline();
+    if (cliente?.id) loadUnifiedTimeline();
   }, [cliente]);
 
-  const loadTimeline = async () => {
+  const loadUnifiedTimeline = async () => {
     setLoading(true);
+    let combinedDocs: any[] = [];
+
     try {
-      const { data, error } = await supabase
+      // 1. BUSCAR DA FICHA DE ENTREVISTA (Tabela interviews)
+      const { data: interviewData } = await supabase
         .from('interviews')
         .select('timeline_json')
         .eq('client_id', cliente.id)
         .maybeSingle();
 
-      if (error) throw error;
-
-      if (data && Array.isArray(data.timeline_json)) {
-        // ✅ CORREÇÃO: Ordena pela data completa (issueDate) ou pelo ano antigo
-        const sorted = data.timeline_json.sort((a: any, b: any) => {
-            const dateA = new Date(a.issueDate || `${a.year}-01-01`).getTime();
-            const dateB = new Date(b.issueDate || `${b.year}-01-01`).getTime();
-            return dateA - dateB;
-        });
-        setTimeline(sorted);
+      if (interviewData?.timeline_json && Array.isArray(interviewData.timeline_json)) {
+        const docsFicha = interviewData.timeline_json.map((doc: any) => ({
+          id: doc.id || Math.random().toString(),
+          type: doc.type || "Registro Ficha",
+          customName: doc.description || "", // Alguns registros antigos usavam description
+          issueDate: doc.issueDate || (doc.year ? `${doc.year}-01-01` : 'S/D'),
+          displayYear: doc.year || (doc.issueDate ? doc.issueDate.split('-')[0] : "?"),
+          fileUrl: doc.fileUrl || null,
+          fileName: doc.fileName || null,
+          source: 'Entrevista Rural',
+          law: doc.law
+        }));
+        combinedDocs = [...combinedDocs, ...docsFicha];
       }
+
+      // 2. BUSCAR DO CADASTRO/GED (Tabela clients)
+      const { data: clientData } = await supabase
+        .from('clients')
+        .select('personal_docs')
+        .eq('id', cliente.id)
+        .single();
+
+      if (clientData?.personal_docs && Array.isArray(clientData.personal_docs)) {
+        const docsCadastro = clientData.personal_docs.map((doc: any, idx: number) => ({
+          id: `ged-${idx}`,
+          type: doc.category || "Documento Pessoal",
+          customName: doc.name || "Upload",
+          issueDate: doc.issueDate || new Date().toISOString().split('T')[0],
+          displayYear: doc.issueDate ? doc.issueDate.split('-')[0] : new Date().getFullYear(),
+          fileUrl: doc.url,
+          fileName: doc.fileName || "arquivo_anexo",
+          source: 'GED / Cadastro',
+          law: ""
+        }));
+        combinedDocs = [...combinedDocs, ...docsCadastro];
+      }
+
+      // 3. BUSCAR DA NOVA TABELA (client_documents - Se existir no futuro)
+      const { data: newDocs } = await supabase
+        .from('client_documents')
+        .select('*')
+        .eq('client_id', cliente.id);
+
+      if (newDocs) {
+        const docsDb = newDocs.map((doc: any) => ({
+          id: doc.id,
+          type: doc.category || "Geral",
+          customName: doc.original_name,
+          issueDate: doc.reference_date || doc.created_at,
+          displayYear: new Date(doc.reference_date || doc.created_at).getFullYear(),
+          fileUrl: doc.file_url,
+          fileName: doc.original_name,
+          source: 'GED (Novo)',
+          law: ""
+        }));
+        combinedDocs = [...combinedDocs, ...docsDb];
+      }
+
+      // ORDENAR TUDO POR DATA
+      const sorted = combinedDocs.sort((a, b) => {
+        const dateA = new Date(a.issueDate === 'S/D' ? '1900-01-01' : a.issueDate).getTime();
+        const dateB = new Date(b.issueDate === 'S/D' ? '1900-01-01' : b.issueDate).getTime();
+        return dateA - dateB;
+      });
+
+      setTimeline(sorted);
+
     } catch (err) {
       console.error("Erro ao carregar timeline:", err);
     } finally {
@@ -46,20 +105,12 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
     }
   };
 
-  // Função auxiliar para extrair o ANO da data
-  const getYearDisplay = (item: any) => {
-      if (item.issueDate) return item.issueDate.split('-')[0]; // Pega "2024" de "2024-05-20"
-      if (item.year) return item.year;
-      return "?";
-  };
-
   const filteredItems = timeline.filter(item => {
     const search = filter.toLowerCase();
     const type = (item.type || "").toLowerCase();
     const name = (item.customName || "").toLowerCase();
-    const fileName = (item.fileName || "").toLowerCase();
-    const year = getYearDisplay(item);
-    return type.includes(search) || name.includes(search) || fileName.includes(search) || year.includes(search);
+    const year = String(item.displayYear);
+    return type.includes(search) || name.includes(search) || year.includes(search);
   });
 
   return (
@@ -76,7 +127,7 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
                         Linha do Tempo
                     </h1>
                     <p className="text-xs font-medium text-slate-500 flex items-center gap-1">
-                        <Clock size={12}/> Visualização Cronológica das Provas
+                        <Clock size={12}/> Visualização Cronológica Unificada
                     </p>
                 </div>
             </div>
@@ -99,35 +150,31 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
         {loading ? (
             <div className="flex flex-col items-center justify-center h-64 text-slate-400 animate-pulse">
                 <Calendar size={48} className="mb-4 opacity-20"/>
-                <p>Carregando cronologia...</p>
+                <p>Consolidando história do cliente...</p>
             </div>
         ) : filteredItems.length === 0 ? (
             <div className="max-w-md mx-auto mt-10 text-center p-10 bg-white rounded-[2rem] border-2 border-dashed border-slate-200">
                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
                     <AlertCircle className="text-slate-300" size={32}/>
                 </div>
-                <h3 className="text-slate-700 font-bold mb-1">Nenhum documento encontrado</h3>
-                <p className="text-sm text-slate-400">Tente mudar o filtro ou adicione provas na entrevista.</p>
+                <h3 className="text-slate-700 font-bold mb-1">Nenhum registro encontrado</h3>
+                <p className="text-sm text-slate-400">Adicione provas através do botão GED no painel.</p>
             </div>
         ) : (
             <div className="max-w-4xl mx-auto relative pb-20">
                 <div className="absolute left-8 md:left-1/2 top-0 bottom-0 w-px bg-gradient-to-b from-emerald-500 via-slate-300 to-transparent -translate-x-1/2"></div>
 
                 {filteredItems.map((item, idx) => {
-                    const fileName = item.fileName || "Documento";
-                    const fileExt = fileName.includes('.') ? fileName.split('.').pop()?.toUpperCase() : "DOC";
+                    const fileExt = item.fileName?.includes('.') ? item.fileName.split('.').pop()?.toUpperCase() : "DOC";
                     const isEven = idx % 2 === 0;
-                    
-                    // ✅ CORREÇÃO: Usando a função auxiliar para mostrar o ano correto
-                    const displayYear = getYearDisplay(item);
 
                     return (
-                        <div key={item.id || idx} className={`relative flex items-center mb-12 ${isEven ? 'md:flex-row-reverse' : ''} group`}>
-                            
-                            {/* ANO (NÓ CENTRAL) - AGORA COM O VALOR CORRETO */}
+                        <div key={item.id} className={`relative flex items-center mb-12 ${isEven ? 'md:flex-row-reverse' : ''} group`}>
+                             
+                            {/* ANO (NÓ CENTRAL) */}
                             <div className="absolute left-8 md:left-1/2 -translate-x-1/2 w-12 h-12 bg-white border-4 border-slate-100 rounded-2xl flex flex-col items-center justify-center z-10 shadow-lg group-hover:scale-110 group-hover:border-emerald-100 transition-all duration-300">
                                 <span className="text-[10px] font-bold text-slate-400 uppercase leading-none">Ano</span>
-                                <span className="text-sm font-black text-slate-700 leading-none">{displayYear}</span>
+                                <span className="text-sm font-black text-slate-700 leading-none">{item.displayYear}</span>
                             </div>
 
                             <div className={`w-full md:w-[45%] pl-20 md:pl-0 ${isEven ? 'md:pr-14' : 'md:pl-14'}`}>
@@ -137,8 +184,11 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
 
                                     <div className="flex justify-between items-start mb-3">
                                         <div>
-                                            <h4 className="font-bold text-slate-800 text-sm leading-tight">{item.type}</h4>
-                                            {item.customName && <p className="text-xs text-slate-500 mt-1">"{item.customName}"</p>}
+                                            <h4 className="font-bold text-slate-800 text-sm leading-tight">{item.customName || item.type}</h4>
+                                            <div className="flex items-center gap-1 mt-1">
+                                                {item.source.includes('GED') ? <Folder size={10} className="text-blue-400"/> : <FileText size={10} className="text-amber-400"/>}
+                                                <span className="text-[10px] text-slate-400 uppercase tracking-wide">{item.source}</span>
+                                            </div>
                                         </div>
                                         <span className="bg-slate-100 text-slate-600 text-[10px] px-2 py-1 rounded-md font-bold uppercase tracking-wider border border-slate-200">{fileExt}</span>
                                     </div>
@@ -160,8 +210,8 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
                                             <ExternalLink size={14}/> Abrir Documento
                                         </a>
                                     ) : (
-                                        <div className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-red-50 text-red-500 text-xs font-bold border border-red-100">
-                                            <AlertCircle size={14}/> Arquivo Ausente
+                                        <div className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl bg-slate-100 text-slate-400 text-xs font-bold border border-slate-200 cursor-not-allowed">
+                                            <AlertCircle size={14}/> Apenas Registro (Sem Arquivo)
                                         </div>
                                     )}
                                 </div>
