@@ -7,7 +7,9 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { analisarViabilidade, AnalysisResult, ClientData } from "../../utils/benefitRules";
-import { useToast } from "../../hooks/use-toast"; // Novo Hook
+import { useToast } from "../../hooks/use-toast";
+import { getLocalDateISO } from "../../lib/utils"; // FIX: Importado para resolver o problema do fuso horário
+import { Client } from "../../types"; // FIX: Tipagem estrita
 
 // --- LISTA DE FUNDAMENTAÇÕES ---
 const DOCUMENT_OPTIONS = [
@@ -16,7 +18,6 @@ const DOCUMENT_OPTIONS = [
   { type: "ITR ou CCIR", law: "IN 128/2022, Art. 116, IX; Tema 1115 STJ" },
   { type: "Certidão de Casamento/União Estável", law: "IN 128/2022, Art. 116, XI; Súmula 6 TNU" },
   { type: "DAP ou CAF (Pronaf)", law: "Lei 8.213/91, Art. 106, IV; IN 128/2022, Art. 116, II" },
-  // ... outros docs ...
 ];
 
 const BENEFIT_TYPES = [
@@ -28,8 +29,9 @@ const BENEFIT_TYPES = [
   "Pensão por morte"
 ];
 
+// FIX: Cliente não é mais 'any'
 interface AnalysisPageProps {
-  cliente: any;
+  cliente: Client;
   onBack: () => void;
 }
 
@@ -47,13 +49,26 @@ interface Periodo {
   law?: string; 
 }
 
+// FIX: Tipagem unificada para a listagem lateral de documentos
+interface DocumentTimelineItem {
+  id: string;
+  type: string;
+  issueDate: string;
+  displayYear: string | number;
+  fileUrl: string | null;
+  origem: string;
+}
+
 export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  const [der, setDer] = useState(new Date().toISOString().split('T')[0]); 
+  
+  // FIX: Previne que às 22h no Brasil a data pule para o dia seguinte por causa do UTC
+  const [der, setDer] = useState(getLocalDateISO()); 
+  
   const [selectedBenefit, setSelectedBenefit] = useState(BENEFIT_TYPES[0]);
   const [periodos, setPeriodos] = useState<Periodo[]>([]);
-  const [documentos, setDocumentos] = useState<any[]>([]);
+  const [documentos, setDocumentos] = useState<DocumentTimelineItem[]>([]);
 
   const [extraParams, setExtraParams] = useState({
     data_dii: "",
@@ -88,17 +103,19 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
     executarAnaliseJuridica();
   }, [periodos, selectedBenefit, extraParams, der]);
 
+  // FIX: Fim do Network Waterfall e tipagem estrita nos maps
   const loadAllData = async () => {
     setLoading(true);
-    let docsColetados: any[] = [];
+    let docsColetados: DocumentTimelineItem[] = [];
     try {
-        // 1. BUSCAR DADOS DA ENTREVISTA
-        const { data: interviewData } = await supabase
-          .from('interviews')
-          .select('analise_periodos, data_der, timeline_json, tipo_beneficio, analise_params')
-          .eq('client_id', cliente.id)
-          .maybeSingle();
+        // Consultas em paralelo para performance máxima
+        const [interviewRes, clientRes, newDocsRes] = await Promise.all([
+            supabase.from('interviews').select('analise_periodos, data_der, timeline_json, tipo_beneficio, analise_params').eq('client_id', cliente.id).maybeSingle(),
+            supabase.from('clients').select('personal_docs').eq('id', cliente.id).single(),
+            supabase.from('client_documents').select('*').eq('client_id', cliente.id)
+        ]);
 
+        const interviewData = interviewRes.data;
         if (interviewData) {
             if (interviewData.analise_periodos) setPeriodos(interviewData.analise_periodos);
             if (interviewData.data_der) setDer(interviewData.data_der);
@@ -106,7 +123,8 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
             if (interviewData.analise_params) setExtraParams(interviewData.analise_params); 
             
             if (interviewData.timeline_json && Array.isArray(interviewData.timeline_json)) {
-                const docsDaFicha = interviewData.timeline_json.map((doc: any) => ({
+                // Tipagem garantida sem 'any'
+                const docsDaFicha = interviewData.timeline_json.map((doc: Record<string, string>) => ({
                     id: doc.id || Math.random().toString(),
                     type: doc.type || "Documento Ficha",
                     issueDate: doc.issueDate || (doc.year ? `${doc.year}-01-01` : 'S/D'), 
@@ -118,33 +136,27 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
             }
         }
 
-        // 2. BUSCAR LEGADO DO CADASTRO (JSON)
-        const { data: clientData } = await supabase.from('clients').select('personal_docs').eq('id', cliente.id).single();
-        if (clientData?.personal_docs) {
-            const docsUpload = clientData.personal_docs.map((doc: any, idx: number) => ({
+        const clientData = clientRes.data;
+        if (clientData?.personal_docs && Array.isArray(clientData.personal_docs)) {
+            const docsUpload = clientData.personal_docs.map((doc: Record<string, string>, idx: number) => ({
                 id: `upload-${idx}`,
                 type: doc.name || "Documento Anexado",
                 issueDate: doc.issueDate || 'S/D',
                 displayYear: doc.issueDate ? doc.issueDate.split('-')[0] : 'S/D',
-                fileUrl: doc.url,
+                fileUrl: doc.url || null,
                 origem: 'Legado (JSON)'
             }));
             docsColetados = [...docsColetados, ...docsUpload];
         }
 
-        // 3. BUSCAR DA NOVA TABELA RELACIONAL (FIX IMPLEMENTADO)
-        const { data: newDocs } = await supabase
-            .from('client_documents')
-            .select('*')
-            .eq('client_id', cliente.id);
-
+        const newDocs = newDocsRes.data;
         if (newDocs) {
-            const docsRelacionais = newDocs.map((doc: any) => ({
+            const docsRelacionais = newDocs.map((doc: Record<string, string>) => ({
                 id: doc.id,
                 type: doc.title || "Sem Título",
                 issueDate: doc.reference_date || doc.created_at,
                 displayYear: new Date(doc.reference_date || doc.created_at).getFullYear(),
-                fileUrl: doc.file_url,
+                fileUrl: doc.file_url || null,
                 origem: 'GED (Novo)'
             }));
             docsColetados = [...docsColetados, ...docsRelacionais];
@@ -153,12 +165,12 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
         setDocumentos(docsColetados.sort((a, b) => new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime()));
     } catch (error) {
         console.error(error);
+        toast({ variant: "destructive", title: "Erro", description: "Falha ao carregar dados da análise." });
     } finally {
         setLoading(false);
     }
   };
 
-  // Funções Auxiliares de Data
   const diffMonths = (d1: string, d2: string) => {
     if (!d1 || !d2) return 0;
     const date1 = new Date(d1);
@@ -182,9 +194,8 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
         const meses = diffMonths(p.inicio, p.fim);
         if (p.tipo === 'rural') rural += meses;
         else if (p.tipo === 'urbano') {
-            // Em tese, safra não conta carência urbana comum, mas conta tempo. Simplificado aqui.
             if (p.is_safra) urbano += meses; else urbano += meses;
-        } else if (p.tipo === 'beneficio') rural += meses; // Benefício intercalado conta
+        } else if (p.tipo === 'beneficio') rural += meses;
     });
     setTotalRural(rural);
     setTotalHibrido(rural + urbano);
@@ -193,15 +204,14 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
   const executarAnaliseJuridica = () => {
       const clientData: ClientData = {
           sexo: cliente.sexo || 'Masculino',
-          data_nascimento: cliente.data_nascimento,
+          data_nascimento: cliente.data_nascimento || "",
           profissao: cliente.profissao || 'Rural',
           tempo_rural_anos: totalRural / 12, 
           tempo_urbano_anos: (totalHibrido - totalRural) / 12,
-          possui_cnpj: cliente.possui_cnpj,
-          possui_outra_renda: cliente.possui_outra_renda,
+          possui_cnpj: cliente.possui_cnpj || false,
+          possui_outra_renda: cliente.possui_outra_renda || false,
           ...extraParams 
       };
-      // Aqui usamos a função utilitária que você já tem
       const resultado = analisarViabilidade(selectedBenefit, clientData);
       setAnaliseJuridica(resultado);
   };
@@ -260,12 +270,13 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
             data_der: der,
             tipo_beneficio: selectedBenefit,
             analise_params: extraParams,
-            updated_at: new Date()
+            updated_at: getLocalDateISO() // FIX: Fuso horário respeitado
         }, { onConflict: 'client_id' });
         if (error) throw error;
         toast({ title: "Sucesso", description: "Cálculo salvo.", variant: "success" });
-    } catch (err: any) {
-        toast({ title: "Erro", description: err.message, variant: "destructive" });
+    } catch (err: unknown) { // FIX: Segurança de Tipos
+        const message = err instanceof Error ? err.message : "Erro desconhecido";
+        toast({ title: "Erro", description: message, variant: "destructive" });
     } finally {
         setLoading(false);
     }
@@ -322,7 +333,6 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
                 </div>
             </div>
 
-            {/* SEÇÃO DE INPUT DE DII/ACIDENTE/PENSÃO - MANTIDA IGUAL */}
             {(showDII || showPensao) && (
                 <div className="bg-blue-50 p-5 rounded-2xl border border-blue-100 shadow-sm animate-in fade-in slide-in-from-top-4">
                     <h3 className="font-bold text-blue-800 mb-4 flex items-center gap-2 text-sm">{showDII ? <Activity size={16}/> : <Heart size={16}/>} Parâmetros Específicos: {selectedBenefit}</h3>
@@ -351,7 +361,6 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
                 </div>
             )}
 
-            {/* CARD DE RESULTADO DA ANÁLISE AUTOMÁTICA */}
             {analiseJuridica && (
                 <div className={`p-5 rounded-2xl border shadow-sm transition-all animate-in zoom-in-95 ${analiseJuridica.status === 'aprovado' ? 'bg-emerald-50 border-emerald-200' : analiseJuridica.status === 'rejeitado' ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'}`}>
                     <div className="flex items-start gap-3">
@@ -364,7 +373,6 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
                 </div>
             )}
 
-            {/* FORMULÁRIO DE INSERÇÃO DE PERÍODOS */}
             <div id="form-anchor" className={`p-6 rounded-2xl border shadow-sm transition-colors ${editingId ? 'bg-amber-50 border-amber-200' : 'bg-white border-slate-200'}`}>
                 <div className="flex justify-between items-center mb-4">
                     <h3 className={`font-bold flex items-center gap-2 ${editingId ? 'text-amber-700' : 'text-slate-700'}`}>{editingId ? <Edit2 size={18}/> : <Plus size={18}/>} {editingId ? "Editando Período" : "Adicionar Período"}</h3>
@@ -398,7 +406,6 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
                 </div>
             </div>
 
-            {/* LISTAGEM DOS PERÍODOS */}
             <div className="space-y-3">
                 {periodos.map((p) => {
                     const meses = diffMonths(p.inicio, p.fim);
@@ -427,12 +434,11 @@ export function AnalysisPage({ cliente, onBack }: AnalysisPageProps) {
             </div>
         </div>
 
-        {/* PAINEL LATERAL DE DOCUMENTOS (Somente Visualização) */}
         <div className="w-full md:w-80 bg-slate-100 border-l border-slate-200 p-4 overflow-y-auto hidden md:block">
             <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 flex items-center gap-2"><Paperclip size={14}/> Documentos Disponíveis</h3>
             {documentos.length === 0 ? (<div className="text-center py-10 text-slate-400 text-xs">Nenhum documento.</div>) : (
                 <div className="space-y-3">
-                    {documentos.map((doc: any, i) => (
+                    {documentos.map((doc, i) => (
                         <div key={`${doc.id}-${i}`} className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm hover:border-blue-300 transition-colors group">
                             <div className="flex justify-between items-start mb-1">
                                 <span className="bg-slate-100 text-slate-600 text-[10px] font-bold px-1.5 py-0.5 rounded">{doc.displayYear}</span>

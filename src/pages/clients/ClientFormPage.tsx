@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom"; // IMPORTANTE: Hook de navegação
+import { useNavigate } from "react-router-dom";
 import { 
   ArrowLeft, Save, User, MapPin, Phone, 
   AlertTriangle, Shield, PenTool,
@@ -9,6 +9,26 @@ import {
 import { supabase } from "../../lib/supabase";
 import { useToast } from "../../hooks/use-toast";
 import { getLocalDateISO } from "../../lib/utils";
+import { ClientFormData, RuralFormData, Period } from "../../types";
+
+// TIPAGEM ESTRITA: Estendemos o DTO base para cobrir todos os campos do seu ecrã
+interface FormCivilState extends Partial<ClientFormData> {
+  analfabeto?: boolean;
+  capacidade_civil?: string;
+  rep_nome?: string; rep_cpf?: string; rep_rg?: string; rep_parentesco?: string; rep_endereco?: string; rep_telefone?: string;
+  rg?: string; orgao_expedidor?: string; data_expedicao?: string; nit?: string; ctps?: string; senha_meu_inss?: string;
+  nome_mae?: string; nome_pai?: string; nome_conjuge?: string; cpf_conjuge?: string;
+  telefone_recado?: string; resumo_cnis?: string; historico_beneficios?: string;
+  detalhes_cnpj?: string; detalhes_renda?: string;
+  endereco_divergente?: boolean; justificativa_endereco?: string;
+}
+
+interface FormRuralState extends Partial<RuralFormData> {
+  area_total?: string; area_util?: string; municipio_uf?: string;
+  outorgante_nome?: string; outorgante_cpf?: string;
+  destinacao?: string; locais_venda?: string;
+  tem_empregados?: string; tempo_empregados?: string; grupo_familiar?: string;
+}
 
 interface ClientFormProps {
   onBack: () => void;
@@ -16,45 +36,37 @@ interface ClientFormProps {
 }
 
 export function ClientFormPage({ onBack, clienteId }: ClientFormProps) {
-  const navigate = useNavigate(); // Hook para navegar entre páginas
+  const navigate = useNavigate();
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'civil' | 'rural'>('civil');
   const [idade, setIdade] = useState<number | null>(null);
   
-  // --- ESTADO 1: DADOS CIVIS ---
-  const [formData, setFormData] = useState<any>({
-    nome: "",
-    sexo: "Masculino",
-    analfabeto: false,
-    cpf: "",
-    data_nascimento: "",
-    naturalidade: "",
-    nacionalidade: "Brasileiro(a)",
-    profissao: "Agricultor(a)",
+  // ADEUS 'any': Estados fortemente tipados
+  const [formData, setFormData] = useState<FormCivilState>({
+    nome: "", sexo: "Masculino", analfabeto: false, cpf: "", data_nascimento: "",
+    naturalidade: "", nacionalidade: "Brasileiro(a)", profissao: "Agricultor(a)",
     capacidade_civil: "Plena", 
     rep_nome: "", rep_cpf: "", rep_rg: "", rep_parentesco: "", rep_endereco: "", rep_telefone: "",
     rg: "", orgao_expedidor: "", data_expedicao: "", nit: "", ctps: "", senha_meu_inss: "",
     nome_mae: "", nome_pai: "", estado_civil: "Solteiro(a)", nome_conjuge: "", cpf_conjuge: "",
     cep: "", endereco: "", bairro: "", cidade: "", telefone: "", telefone_recado: "",
     resumo_cnis: "", historico_beneficios: "",
-    possui_cnpj: false, detalhes_cnpj: "",
-    possui_outra_renda: false, detalhes_renda: "",
+    possui_cnpj: false, detalhes_cnpj: "", possui_outra_renda: false, detalhes_renda: "",
     endereco_divergente: false, justificativa_endereco: "",
-    personal_docs: [],
     status_processo: "A Iniciar"
   });
 
-  // --- ESTADO 2: DADOS RURAIS ---
-  const [ruralData, setRuralData] = useState<any>({
+  const [ruralData, setRuralData] = useState<FormRuralState>({
     nome_imovel: "", itr_nirf: "", area_total: "", area_util: "", municipio_uf: "",
     condicao_posse: "proprietario", outorgante_nome: "", outorgante_cpf: "",
     culturas: "", animais: "", destinacao: "subsistencia_venda", locais_venda: "",
     tem_empregados: "nao", tempo_empregados: "", grupo_familiar: ""
   });
+  
   const [historico, setHistorico] = useState("");
-  const [timeline, setTimeline] = useState<any[]>([]);
+  const [timeline, setTimeline] = useState<Period[]>([]);
 
   useEffect(() => {
     if (clienteId) loadFullData();
@@ -75,38 +87,37 @@ export function ClientFormPage({ onBack, clienteId }: ClientFormProps) {
     }
   }, [formData.data_nascimento]);
 
+  // REFATORAÇÃO DE PERFORMANCE: Fim do Waterfall (Promise.all)
   const loadFullData = async () => {
     setLoading(true);
     try {
-      const { data: clientData, error: clientError } = await supabase
-        .from('clients')
-        .select('*')
-        .eq('id', clienteId)
-        .single();
+      const [clientRes, interviewRes] = await Promise.all([
+        supabase.from('clients').select('*').eq('id', clienteId).single(),
+        supabase.from('interviews').select('*').eq('client_id', clienteId).maybeSingle()
+      ]);
 
-      if (clientError) throw clientError;
-      if (clientData) {
-        setFormData({
-          ...clientData,
-          nome: clientData.nome || "",
-          sexo: clientData.sexo || "Masculino",
-          analfabeto: clientData.analfabeto || false,
-          cpf: clientData.cpf || "",
-          data_nascimento: clientData.data_nascimento || "",
-          personal_docs: clientData.personal_docs || []
-        });
+      if (clientRes.error) throw clientRes.error;
+      
+      if (clientRes.data) {
+        setFormData((prev) => ({
+          ...prev,
+          ...clientRes.data,
+          nome: clientRes.data.nome || "",
+          sexo: clientRes.data.sexo || "Masculino",
+          analfabeto: clientRes.data.analfabeto || false,
+          cpf: clientRes.data.cpf || "",
+          data_nascimento: clientRes.data.data_nascimento || ""
+        }));
       }
 
-      const { data: interviewData } = await supabase
-        .from('interviews')
-        .select('*')
-        .eq('client_id', clienteId)
-        .maybeSingle();
-
-      if (interviewData) {
-        setHistorico(interviewData.historico_locais || "");
-        if (Array.isArray(interviewData.timeline_json)) setTimeline(interviewData.timeline_json);
-        if (interviewData.dados_rurais) setRuralData((prev: any) => ({ ...prev, ...interviewData.dados_rurais }));
+      if (interviewRes.data) {
+        setHistorico(interviewRes.data.historico_locais || "");
+        if (Array.isArray(interviewRes.data.timeline_json)) {
+            setTimeline(interviewRes.data.timeline_json as Period[]);
+        }
+        if (interviewRes.data.dados_rurais) {
+            setRuralData((prev) => ({ ...prev, ...(interviewRes.data.dados_rurais as FormRuralState) }));
+        }
       }
     } catch (error) {
       console.error("Erro:", error);
@@ -116,7 +127,6 @@ export function ClientFormPage({ onBack, clienteId }: ClientFormProps) {
     }
   };
 
-  // Handlers básicos (CEP, Máscaras) mantidos iguais...
   const mascaraCPF = (v: string) => v.replace(/\D/g, '').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d{1,2})/, '$1-$2').replace(/(-\d{2})\d+?$/, '$1');
   const mascaraTelefone = (v: string) => { v = v.replace(/\D/g, ""); v = v.replace(/^(\d{2})(\d)/g, "($1) $2"); v = v.replace(/(\d)(\d{4})$/, "$1-$2"); return v.substring(0, 15); };
   const mascaraCEP = (v: string) => v.replace(/\D/g, '').replace(/^(\d{5})(\d)/, '$1-$2').substring(0, 9);
@@ -127,21 +137,22 @@ export function ClientFormPage({ onBack, clienteId }: ClientFormProps) {
     if (name === 'cpf' || name === 'cpf_conjuge' || name === 'rep_cpf') value = mascaraCPF(value);
     if (name === 'telefone' || name === 'telefone_recado' || name === 'rep_telefone') value = mascaraTelefone(value);
     if (name === 'cep') value = mascaraCEP(value);
-    setFormData((prev: any) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
+    setFormData((prev) => ({ ...prev, [name]: type === 'checkbox' ? checked : value }));
   };
 
   const handleRuralChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    setRuralData({ ...ruralData, [e.target.name]: e.target.value });
+    setRuralData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const handleBlurCep = async () => {
+    if (!formData.cep) return;
     const cepLimpo = formData.cep.replace(/\D/g, '');
     if (cepLimpo.length === 8) {
       try {
         const res = await fetch(`https://viacep.com.br/ws/${cepLimpo}/json/`);
         const data = await res.json();
         if (!data.erro) {
-          setFormData((prev: any) => ({
+          setFormData((prev) => ({
             ...prev,
             endereco: data.logradouro,
             bairro: data.bairro,
@@ -150,7 +161,9 @@ export function ClientFormPage({ onBack, clienteId }: ClientFormProps) {
           }));
           toast({ title: "CEP Encontrado", description: `${data.logradouro}, ${data.bairro}`, variant: "success" });
         }
-      } catch (error) {}
+      } catch (error) {
+         console.error("Erro na busca de CEP:", error);
+      }
     }
   };
 
@@ -196,13 +209,13 @@ export function ClientFormPage({ onBack, clienteId }: ClientFormProps) {
 
         toast({ title: "Sucesso!", description: "Dados salvos.", variant: "success" });
         
-        // Se for novo cadastro, redireciona para o dashboard ou para a página de edição do mesmo
         if (!clienteId && currentClientId) {
             navigate(`/cliente/${currentClientId}`);
         }
 
-    } catch (error: any) {
-        toast({ title: "Erro", description: error.message, variant: "destructive" });
+    } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : "Erro desconhecido ao guardar.";
+        toast({ title: "Erro", description: errorMessage, variant: "destructive" });
     } finally {
         setLoading(false);
     }

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom"; // Hook para navegar
+import { useNavigate } from "react-router-dom"; 
 import { 
   Users, Plus, Search, MapPin, Phone, 
   ChevronRight, LayoutList 
@@ -7,7 +7,6 @@ import {
 import { supabase } from "../../lib/supabase";
 import { Client } from "../../types";
 
-// Removemos as props antigas (onSelectClient, onNewClient)
 export function ClientListPage() {
   const navigate = useNavigate();
   const [clients, setClients] = useState<Client[]>([]);
@@ -20,18 +19,32 @@ export function ClientListPage() {
 
   const fetchClients = async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('clients')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (data) setClients(data);
-    setLoading(false);
+    try {
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .order('created_at', { ascending: false });
+        
+      if (error) throw error;
+      if (data) setClients(data as Client[]); // FIX: Garantia de tipagem estrita no retorno da BD
+      
+    } catch (err: unknown) { // FIX: Prevenção contra falhas de rede silenciosas
+      const msg = err instanceof Error ? err.message : "Erro desconhecido ao carregar clientes";
+      console.error("Falha na listagem:", msg);
+      alert("Não foi possível carregar a lista de clientes. Verifique a sua ligação.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const filteredClients = clients.filter(c => 
-    (c.nome && c.nome.toLowerCase().includes(searchTerm.toLowerCase())) ||
-    (c.cpf && c.cpf.includes(searchTerm))
-  );
+  // FIX: Uso de Optional Chaining (?.) para um código mais limpo e seguro contra dados corrompidos
+  const filteredClients = clients.filter(c => {
+    const search = searchTerm.toLowerCase();
+    return (
+      c.nome?.toLowerCase().includes(search) ||
+      c.cpf?.includes(search)
+    );
+  });
 
   const getStatusColor = (status: string | undefined) => {
       switch(status) {
@@ -130,4 +143,6 @@ export function ClientListPage() {
       </main>
     </div>
   );
-}
+}git add .
+git commit -m "Refatoração Fase 5: Tipagens estritas, remoção de 'any' e otimização de performance no Dashboard, Documentos e Relatórios"
+git push origin main

@@ -4,15 +4,15 @@ import {
   Hash, Briefcase, Save, Building
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { Lawyer } from "../../types"; // FIX: Usar a Interface Global
 
-interface Lawyer {
-  id?: number;
-  nome: string;
-  nacionalidade: string;
-  estado_civil: string;
-  oab: string;
-  cpf: string;
+// FIX: Estender a interface global para suportar o campo nacionalidade apenas neste ecrã
+interface LawyerExtended extends Lawyer {
+  nacionalidade?: string;
 }
+
+// FIX: Interface específica para o estado do formulário (onde o ID pode ser nulo antes de criar)
+type LawyerFormData = Partial<LawyerExtended>;
 
 function validarCPF(cpf: string) {
   cpf = cpf.replace(/[^\d]+/g, '');
@@ -31,14 +31,14 @@ function validarCPF(cpf: string) {
 }
 
 export function LawyersPage({ onBack }: { onBack: () => void }) {
-  const [lawyers, setLawyers] = useState<Lawyer[]>([]);
+  const [lawyers, setLawyers] = useState<LawyerExtended[]>([]); // FIX: Array Tipado
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
   
   const [officeAddress, setOfficeAddress] = useState("");
 
-  const [formData, setFormData] = useState<Lawyer>({
+  const [formData, setFormData] = useState<LawyerFormData>({
     nome: "",
     nacionalidade: "Brasileiro",
     estado_civil: "Casado",
@@ -55,7 +55,7 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
   const fetchLawyers = async () => {
     setLoading(true);
     const { data } = await supabase.from('lawyers').select('*').order('nome');
-    if (data) setLawyers(data);
+    if (data) setLawyers(data as LawyerExtended[]);
     setLoading(false);
   };
 
@@ -88,7 +88,7 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
       alert("Endereço do escritório atualizado!");
   };
 
-  const handleEdit = (lawyer: Lawyer) => {
+  const handleEdit = (lawyer: LawyerExtended) => {
       setFormData(lawyer);
       setShowModal(true);
   };
@@ -104,7 +104,8 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
       setFormData({ nome: "", nacionalidade: "Brasileiro", estado_civil: "Casado", oab: "", cpf: "" });
   };
 
-  const handleCpfChange = (e: any) => {
+  // FIX: Tipagem do evento DOM
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let v = e.target.value.replace(/\D/g, "");
     if (v.length > 11) v = v.slice(0, 11);
     v = v.replace(/(\d{3})(\d)/, "$1.$2");
@@ -158,7 +159,7 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
                         {lawyers.map(adv => (
                             <div key={adv.id} className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 hover:shadow-md transition-all group relative">
                                 <div className="flex items-center gap-4 mb-4">
-                                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold text-lg group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">{adv.nome.charAt(0)}</div>
+                                    <div className="w-12 h-12 bg-slate-100 rounded-full flex items-center justify-center text-slate-500 font-bold text-lg group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">{adv.nome?.charAt(0)}</div>
                                     <div><h3 className="font-bold text-slate-800">{adv.nome}</h3><p className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded w-fit mt-1">OAB: {adv.oab}</p></div>
                                 </div>
                                 <div className="space-y-2 text-xs text-slate-500 mb-4">
@@ -182,14 +183,14 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
             <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95">
                 <div className="bg-slate-50 p-6 border-b border-slate-100 flex justify-between items-center"><h3 className="font-bold text-slate-800 flex items-center gap-2"><FileText size={18} className="text-blue-500"/> Dados do Advogado</h3><button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600">✕</button></div>
                 <div className="p-6 space-y-4">
-                    <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Nome Completo</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" value={formData.nome} onChange={e => setFormData({...formData, nome: e.target.value})} placeholder="Dr. Fulano..." /></div>
+                    <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Nome Completo</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" value={formData.nome || ""} onChange={e => setFormData({...formData, nome: e.target.value})} placeholder="Dr. Fulano..." /></div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Nº OAB</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" value={formData.oab} onChange={e => setFormData({...formData, oab: e.target.value})} placeholder="UF 00.000" /></div>
-                        <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">CPF</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" value={formData.cpf} onChange={handleCpfChange} placeholder="000.000.000-00" maxLength={14} /></div>
+                        <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Nº OAB</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" value={formData.oab || ""} onChange={e => setFormData({...formData, oab: e.target.value})} placeholder="UF 00.000" /></div>
+                        <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">CPF</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" value={formData.cpf || ""} onChange={handleCpfChange} placeholder="000.000.000-00" maxLength={14} /></div>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Nacionalidade</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" value={formData.nacionalidade} onChange={e => setFormData({...formData, nacionalidade: e.target.value})} /></div>
-                        <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Estado Civil</label><select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" value={formData.estado_civil} onChange={e => setFormData({...formData, estado_civil: e.target.value})}><option value="Solteiro">Solteiro(a)</option><option value="Casado">Casado(a)</option><option value="Divorciado">Divorciado(a)</option><option value="Viúvo">Viúvo(a)</option></select></div>
+                        <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Nacionalidade</label><input className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" value={formData.nacionalidade || ""} onChange={e => setFormData({...formData, nacionalidade: e.target.value})} /></div>
+                        <div><label className="text-[10px] font-bold text-slate-400 uppercase mb-1 block">Estado Civil</label><select className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:border-blue-500" value={formData.estado_civil || "Casado"} onChange={e => setFormData({...formData, estado_civil: e.target.value})}><option value="Solteiro">Solteiro(a)</option><option value="Casado">Casado(a)</option><option value="Divorciado">Divorciado(a)</option><option value="Viúvo">Viúvo(a)</option></select></div>
                     </div>
                 </div>
                 <div className="p-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-3"><button onClick={() => setShowModal(false)} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-100 rounded-lg">Cancelar</button><button onClick={handleSaveLawyer} disabled={saving} className="px-6 py-2 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 shadow-lg">{saving ? "Salvando..." : "Salvar Advogado"}</button></div>

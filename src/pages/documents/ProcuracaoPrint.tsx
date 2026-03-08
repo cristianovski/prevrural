@@ -1,10 +1,16 @@
 import { useState, useEffect } from "react";
 import { ArrowLeft, Printer, Scale, Building2, Users, FileText, ChevronRight, FileCheck, Tractor } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { Client, Lawyer, Period } from "../../types"; 
 
 interface ProcuracaoProps {
-  cliente: any;
+  cliente: Client; 
   onBack: () => void;
+}
+
+interface LegacyPeriod extends Period {
+    start?: string;
+    end?: string;
 }
 
 const MODELOS = {
@@ -46,8 +52,8 @@ const MODELOS = {
 };
 
 export function ProcuracaoPrint({ cliente, onBack }: ProcuracaoProps) {
-  const [lawyers, setLawyers] = useState<any[]>([]);
-  const [timeline, setTimeline] = useState<any[]>([]);
+  const [lawyers, setLawyers] = useState<Lawyer[]>([]); 
+  const [timeline, setTimeline] = useState<LegacyPeriod[]>([]); 
   const [loading, setLoading] = useState(true);
   const [officeAddress, setOfficeAddress] = useState("Endereço não configurado");
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
@@ -58,21 +64,27 @@ export function ProcuracaoPrint({ cliente, onBack }: ProcuracaoProps) {
   const dataExtenso = dataHoje.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' });
   const cidade = "Vitória da Conquista"; 
 
-  const fmtDate = (d: string) => d ? d.split('-').reverse().join('/') : '___/___/_____';
+  const fmtDate = (d?: string) => d ? d.split('-').reverse().join('/') : '___/___/_____';
+  
+  const getStart = (p: LegacyPeriod) => p.start_date || p.start || "";
+  const getEnd = (p: LegacyPeriod) => p.end_date || p.end || "";
 
   useEffect(() => {
     const fetchInfo = async () => {
-      const { data: advData } = await supabase.from('lawyers').select('*');
-      if (advData) setLawyers(advData);
-      
       const savedAddress = localStorage.getItem("officeAddress");
       if (savedAddress) setOfficeAddress(savedAddress);
 
-      const { data: interviewData } = await supabase.from('interviews').select('timeline_json').eq('client_id', cliente.id).maybeSingle();
-      if (interviewData && interviewData.timeline_json) {
-         const rurais = interviewData.timeline_json
-            .filter((t: any) => t.type === 'rural')
-            .sort((a:any, b:any) => new Date(a.start).getTime() - new Date(b.start).getTime());
+      const [advRes, interviewRes] = await Promise.all([
+          supabase.from('lawyers').select('*'),
+          supabase.from('interviews').select('timeline_json').eq('client_id', cliente.id).maybeSingle()
+      ]);
+
+      if (advRes.data) setLawyers(advRes.data as Lawyer[]);
+
+      if (interviewRes.data?.timeline_json) {
+         const rurais = (interviewRes.data.timeline_json as LegacyPeriod[])
+            .filter((t) => t.type === 'rural')
+            .sort((a, b) => new Date(getStart(a)).getTime() - new Date(getStart(b)).getTime());
          setTimeline(rurais);
       }
       
@@ -254,7 +266,7 @@ export function ProcuracaoPrint({ cliente, onBack }: ProcuracaoProps) {
                             <tbody>
                                 {timeline.length > 0 ? timeline.map((periodo, idx) => (
                                     <tr key={idx}>
-                                        <td className="border border-black p-2 text-center font-bold">{fmtDate(periodo.start)} a {fmtDate(periodo.end)}</td>
+                                        <td className="border border-black p-2 text-center font-bold">{fmtDate(getStart(periodo))} a {fmtDate(getEnd(periodo))}</td>
                                         <td className="border border-black p-2 text-center" contentEditable suppressContentEditableWarning>POSSEIRO / PROPRIETÁRIO</td>
                                         <td className="border border-black p-2">
                                             <div className="flex flex-col gap-1">

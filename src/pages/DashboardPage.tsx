@@ -23,29 +23,43 @@ export function DashboardPage() {
 
   useEffect(() => {
     fetchClients();
-    const savedNotes = localStorage.getItem("dashboardNotes");
-    if (savedNotes) setNotes(JSON.parse(savedNotes));
+    
+    // FIX: Segurança no Parse do LocalStorage para evitar Crash de Ecrã Branco
+    try {
+        const savedNotes = localStorage.getItem("dashboardNotes");
+        if (savedNotes) setNotes(JSON.parse(savedNotes));
+    } catch (error) {
+        console.error("Erro ao ler notas do cache", error);
+        localStorage.removeItem("dashboardNotes");
+    }
   }, []);
 
   const fetchClients = async () => {
     setLoading(true);
-    const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
-    if (error) {
-        toast({ title: "Erro", description: "Falha ao carregar clientes", variant: "destructive" });
+    try {
+        const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
+        if (error) throw error;
+        if (data) setClients(data as Client[]);
+    } catch (err: unknown) { // FIX: Tipagem Estrita
+        const msg = err instanceof Error ? err.message : "Erro desconhecido";
+        toast({ title: "Erro", description: "Falha ao carregar clientes: " + msg, variant: "destructive" });
+    } finally {
+        setLoading(false);
     }
-    if (data) setClients(data);
-    setLoading(false);
   };
 
   const handleDeleteClient = async (id: number) => {
     if (confirm("ATENÇÃO: Apagar este cliente removerá tudo (ficha, documentos, histórico). Continuar?")) {
-      const { error } = await supabase.from('clients').delete().eq('id', id);
-      if (error) {
-          toast({ title: "Erro", description: "Não foi possível excluir.", variant: "destructive" });
-      } else {
-          toast({ title: "Sucesso", description: "Cliente removido.", variant: "success" });
-          fetchClients();
-      }
+        try {
+            const { error } = await supabase.from('clients').delete().eq('id', id);
+            if (error) throw error;
+            
+            toast({ title: "Sucesso", description: "Cliente removido.", variant: "success" });
+            fetchClients();
+        } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : "Erro ao excluir";
+            toast({ title: "Erro", description: msg, variant: "destructive" });
+        }
     }
   };
 
@@ -54,11 +68,18 @@ export function DashboardPage() {
       const atual = (client.status_processo as string) || "A Iniciar";
       const novo = ciclo[(ciclo.indexOf(atual) + 1) % ciclo.length];
       
-      // Atualização Otimista
+      // Atualização Otimista (Muda na UI imediatamente)
       setClients(prev => prev.map(c => c.id === client.id ? { ...c, status_processo: novo } : c));
       
-      await supabase.from('clients').update({ status_processo: novo }).eq('id', client.id);
-      toast({ title: "Status Atualizado", description: `Novo status: ${novo}`, variant: "default" });
+      try {
+          const { error } = await supabase.from('clients').update({ status_processo: novo }).eq('id', client.id);
+          if (error) throw error;
+          toast({ title: "Status Atualizado", description: `Novo status: ${novo}`, variant: "default" });
+      } catch (err) {
+          // FIX: Se falhar a gravação na base, reverte a UI para a verdade absoluta
+          toast({ title: "Erro", description: "Não foi possível atualizar o status.", variant: "destructive" });
+          fetchClients(); 
+      }
   };
 
   const addNote = () => {
@@ -83,9 +104,12 @@ export function DashboardPage() {
       }
   };
 
+  // FIX: Adicionado Optional Chaining (?.) para defender a pesquisa contra registos corrompidos sem Nome ou CPF
   const clientesFiltrados = clients.filter(c => {
       const s = searchTerm.toLowerCase();
-      return (c.nome.toLowerCase().includes(s) || c.cpf.includes(s)) && (statusFilter === "Todos" || (c.status_processo || "A Iniciar") === statusFilter);
+      const matchText = c.nome?.toLowerCase().includes(s) || c.cpf?.includes(s);
+      const matchStatus = statusFilter === "Todos" || (c.status_processo || "A Iniciar") === statusFilter;
+      return matchText && matchStatus;
   });
 
   const totalCarteira = clients.reduce((acc, curr) => acc + Number(curr.honorarios || 0), 0);
@@ -97,12 +121,16 @@ export function DashboardPage() {
       total: clients.length || 1
   };
 
+  // FIX: Garantia absoluta que partes da data existem antes do Parse
   const mesAtual = new Date().getMonth();
   const aniversariantes = clients.filter(c => {
       if (!c.data_nascimento) return false;
-      const mesNasc = parseInt(c.data_nascimento.split('-')[1]) - 1;
+      const parts = c.data_nascimento.split('-');
+      if (parts.length !== 3) return false; 
+      
+      const mesNasc = parseInt(parts[1], 10) - 1;
       return mesNasc === mesAtual;
-  }).sort((a, b) => parseInt(a.data_nascimento!.split('-')[2]) - parseInt(b.data_nascimento!.split('-')[2]));
+  }).sort((a, b) => parseInt(a.data_nascimento!.split('-')[2], 10) - parseInt(b.data_nascimento!.split('-')[2], 10));
 
   return (
     <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">

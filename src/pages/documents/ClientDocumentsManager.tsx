@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useToast } from "../../hooks/use-toast";
+import { getLocalDateISO } from "../../lib/utils"; // FIX: Importação da função global de datas
 import { Client, ClientDocument } from "../../types"; 
 
 // Base jurídica
@@ -31,9 +32,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   
-  // Tipagem forte para a lista de documentos
   const [docs, setDocs] = useState<ClientDocument[]>([]);
-  
   const [filter, setFilter] = useState("Todos");
   const [searchTerm, setSearchTerm] = useState("");
   
@@ -41,29 +40,18 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // Upload
   const [uploading, setUploading] = useState(false);
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   
-  // Helper for local date string (YYYY-MM-DD)
-  const getTodayLocal = () => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
   const [uploadMetadata, setUploadMetadata] = useState({ 
     category: "Provas" as ClientDocument['category'], 
     docType: "", 
     customName: "", 
-    date: getTodayLocal(),
+    date: getLocalDateISO(), // FIX: Uso da utilitária global
     userObs: ""
   });
 
-  // Edição
   const [editForm, setEditForm] = useState({
     title: "",
     customTitle: "",
@@ -78,11 +66,9 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
     if (cliente?.id) fetchDocuments();
   }, [cliente]);
 
-  // --- BUSCA NA NOVA TABELA ---
   const fetchDocuments = async () => {
     setLoading(true);
     try {
-      // Agora buscamos apenas na tabela relacional (client_documents), pois os dados antigos já foram migrados
       const { data, error } = await supabase
         .from('client_documents')
         .select('*')
@@ -90,18 +76,17 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
         .order('reference_date', { ascending: false });
 
       if (error) throw error;
-      
       setDocs(data as ClientDocument[]); 
 
-    } catch (error: any) {
+    } catch (error: unknown) { // FIX: Tipagem de erro corrigida
+      const msg = error instanceof Error ? error.message : "Erro desconhecido";
       console.error("Erro ao buscar docs:", error);
-      toast({ title: "Erro", description: "Falha ao carregar documentos.", variant: "destructive" });
+      toast({ title: "Erro", description: msg, variant: "destructive" });
     } finally {
       setLoading(false);
     }
   };
 
-  // --- UPLOAD PARA TABELA RELACIONAL ---
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -111,7 +96,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
       category: "Provas",
       docType: "", 
       customName: file.name.split('.')[0], 
-      date: getTodayLocal(),
+      date: getLocalDateISO(), // FIX: Uso da utilitária global
       userObs: ""
     });
     setIsUploadModalOpen(true);
@@ -130,7 +115,6 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
     setUploading(true);
 
     try {
-        // 1. Upload Storage
         const fileExt = fileToUpload.name.split('.').pop();
         const cleanName = finalTitle.replace(/[^a-zA-Z0-9]/g, '_');
         const fileName = `${cliente.id}/${Date.now()}_${cleanName}.${fileExt}`;
@@ -145,7 +129,6 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
             .from('evidence-files')
             .getPublicUrl(fileName);
 
-        // 2. Insert na tabela Relacional (client_documents)
         const { error: dbError } = await supabase
             .from('client_documents')
             .insert({
@@ -165,8 +148,9 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
         setFileToUpload(null);
         fetchDocuments(); 
 
-    } catch (error: any) {
-        toast({ title: "Erro no upload", description: error.message, variant: "destructive" });
+    } catch (error: unknown) { // FIX: Tipagem de erro corrigida
+        const msg = error instanceof Error ? error.message : "Erro desconhecido no upload";
+        toast({ title: "Erro no upload", description: msg, variant: "destructive" });
     } finally {
         setUploading(false);
     }
@@ -223,8 +207,9 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
               description: editForm.description 
           }) : null);
 
-      } catch (err: any) {
-          toast({ title: "Erro", description: err.message, variant: "destructive" });
+      } catch (error: unknown) { // FIX: Tipagem de erro corrigida
+          const msg = error instanceof Error ? error.message : "Erro desconhecido";
+          toast({ title: "Erro", description: msg, variant: "destructive" });
       } finally {
           setSaving(false);
       }
@@ -247,17 +232,16 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
           setSelectedDoc(null);
           fetchDocuments();
 
-      } catch (err: any) {
-          toast({ title: "Erro", description: err.message, variant: "destructive" });
+      } catch (error: unknown) { // FIX: Tipagem de erro corrigida
+          const msg = error instanceof Error ? error.message : "Erro desconhecido ao excluir";
+          toast({ title: "Erro", description: msg, variant: "destructive" });
       } finally {
          setSaving(false);
       }
   };
 
   const filteredDocs = docs.filter(doc => {
-      // FIX CRÍTICO: Garante que title seja uma string vazia se for null/undefined
       const title = doc.title || "";
-
       const matchesSearch = title.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesFilter = filter === "Todos" || doc.category === filter;
       return matchesSearch && matchesFilter;

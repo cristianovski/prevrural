@@ -2,15 +2,24 @@ import { useState, useEffect } from "react";
 import { 
   ArrowLeft, BrainCircuit, CheckCircle, AlertTriangle, 
   XCircle, FileText, Calculator, FolderOpen, BookOpen, Sparkles, Save,
-  Activity, Heart, Calendar
+  Activity, Heart
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { analisarViabilidade, AnalysisResult, calcularIdade, ClientData } from "../../utils/benefitRules"; 
 import { gerarParecerIA } from "../../lib/aiService"; 
+// FIX: Tipagens rigorosas e função de fuso horário importadas
+import { Client, LibraryThesis } from "../../types"; 
+import { getLocalDateISO } from "../../lib/utils";
 
 interface LegalOpinionPageProps {
   clientId: number;
   onBack: () => void;
+}
+
+// FIX: Estendemos o tipo Client para incluir os campos específicos de IA sem alterar a interface global
+interface ClientWithOpinion extends Client {
+    parecer_ia?: string;
+    data_ultima_analise?: string;
 }
 
 const BENEFIT_TYPES = [
@@ -23,22 +32,21 @@ const BENEFIT_TYPES = [
 ];
 
 export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
-  const [client, setClient] = useState<any>(null);
+  // FIX: Adeus 'any'. Tipagem forte aplicada.
+  const [client, setClient] = useState<ClientWithOpinion | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [parecerIA, setParecerIA] = useState("");
   const [lastAnalysisDate, setLastAnalysisDate] = useState<string | null>(null);
   
-  // Teses da Biblioteca
-  const [theses, setTheses] = useState<any[]>([]);
+  // FIX: Tipagem forte para as teses
+  const [theses, setTheses] = useState<LibraryThesis[]>([]);
   const [selectedThesisId, setSelectedThesisId] = useState<string>("");
 
-  // Entradas Manuais para o Simulador
   const [tempoRural, setTempoRural] = useState(15); 
   const [tempoUrbano, setTempoUrbano] = useState(0);
   const [selectedBenefit, setSelectedBenefit] = useState(BENEFIT_TYPES[0]);
   
-  // ✅ NOVOS PARÂMETROS ESPECÍFICOS (Igual à Calculadora)
   const [extraParams, setExtraParams] = useState({
     data_dii: "",
     is_acidente: false,
@@ -47,7 +55,6 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
     idade_conjuge_obito: 0
   });
 
-  // Checklist de Documentos
   const [docsChecklist, setDocsChecklist] = useState({
     certidao_casamento: false,
     historico_escolar: false,
@@ -62,22 +69,20 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
   const [resultado, setResultado] = useState<AnalysisResult | null>(null);
 
   useEffect(() => {
-    fetchClientData();
-    fetchTheses(); 
+    loadAllData();
   }, [clientId]);
 
-  // Recalcula viabilidade matemática (Filtro 1)
   useEffect(() => {
     if (client) {
       const dadosAnalise: ClientData = {
         sexo: client.sexo || 'Masculino',
-        data_nascimento: client.data_nascimento,
-        profissao: client.profissao,
-        possui_cnpj: client.possui_cnpj,
-        possui_outra_renda: client.possui_outra_renda,
+        data_nascimento: client.data_nascimento || "",
+        profissao: client.profissao || "Rural",
+        possui_cnpj: client.possui_cnpj || false,
+        possui_outra_renda: client.possui_outra_renda || false,
         tempo_rural_anos: tempoRural,
         tempo_urbano_anos: tempoUrbano,
-        ...extraParams // Inclui DII, Óbito, etc.
+        ...extraParams 
       };
 
       const analise = analisarViabilidade(selectedBenefit, dadosAnalise);
@@ -85,29 +90,34 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
     }
   }, [client, selectedBenefit, tempoRural, tempoUrbano, extraParams]);
 
-  const fetchClientData = async () => {
-    const { data } = await supabase.from('clients').select('*').eq('id', clientId).single();
-    if (data) {
-        setClient(data);
-        if (data.parecer_ia) {
-            setParecerIA(data.parecer_ia);
-            setLastAnalysisDate(data.data_ultima_analise);
-        }
-    }
-    setLoading(false);
-  };
+  // FIX: Fim do Network Waterfall. Consultamos Cliente e Teses em paralelo.
+  const loadAllData = async () => {
+    setLoading(true);
+    try {
+        const [clientRes, thesesRes] = await Promise.all([
+            supabase.from('clients').select('*').eq('id', clientId).single(),
+            supabase.from('library_theses').select('id, title, content, category').eq('active', true).order('title')
+        ]);
 
-  const fetchTheses = async () => {
-      const { data } = await supabase
-        .from('library_theses')
-        .select('id, title, content, category')
-        .eq('active', true)
-        .order('title');
-      
-      if (data && data.length > 0) {
-          setTheses(data);
-          setSelectedThesisId(data[0].id.toString());
-      }
+        if (clientRes.data) {
+            const data = clientRes.data as ClientWithOpinion;
+            setClient(data);
+            if (data.parecer_ia) {
+                setParecerIA(data.parecer_ia);
+                setLastAnalysisDate(data.data_ultima_analise || null);
+            }
+        }
+
+        if (thesesRes.data && thesesRes.data.length > 0) {
+            const fetchedTheses = thesesRes.data as LibraryThesis[];
+            setTheses(fetchedTheses);
+            setSelectedThesisId(fetchedTheses[0].id.toString());
+        }
+    } catch (error) {
+        console.error("Erro ao carregar dados:", error);
+    } finally {
+        setLoading(false);
+    }
   };
 
   const toggleDoc = (key: keyof typeof docsChecklist) => {
@@ -124,19 +134,19 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
           const teseSelecionada = theses.find(t => t.id.toString() === selectedThesisId);
           const conteudoTese = teseSelecionada ? teseSelecionada.content : "Lei Geral";
 
-          // Monta o pacote de dados para a IA, incluindo os novos campos
           const dadosCompletos = {
               ...client,
-              idade_calculada: calcularIdade(client.data_nascimento),
+              idade_calculada: calcularIdade(client.data_nascimento || ""),
               docs_checklist: docsChecklist,
               beneficio_alvo: selectedBenefit,
-              detalhes_beneficio: extraParams // Passa DII, óbito, etc. para o prompt
+              detalhes_beneficio: extraParams 
           };
 
           const textoGerado = await gerarParecerIA(dadosCompletos, conteudoTese);
           setParecerIA(textoGerado);
           
-          const now = new Date().toISOString();
+          // FIX: Utilizamos a função getLocalDateISO para manter o fuso horário correto
+          const now = getLocalDateISO();
           const { error } = await supabase
             .from('clients')
             .update({ 
@@ -148,18 +158,18 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
           if (error) console.error("Erro ao salvar:", error);
           else setLastAnalysisDate(now);
 
-      } catch (err) {
-          alert("Erro ao gerar: " + err);
+      } catch (err: unknown) { // FIX: Tipagem de erro corrigida
+          const msg = err instanceof Error ? err.message : "Erro desconhecido ao comunicar com a IA.";
+          alert("Erro ao gerar: " + msg);
       } finally {
           setGenerating(false);
       }
   };
 
-  // Helpers para exibir campos condicionais
   const showDII = selectedBenefit.toLowerCase().includes("incapacidade");
   const showPensao = selectedBenefit.toLowerCase().includes("pensão") || selectedBenefit.toLowerCase().includes("morte");
 
-  if (loading) return <div className="p-8 text-center text-slate-500">Carregando dados...</div>;
+  if (loading || !client) return <div className="p-8 text-center text-slate-500 font-bold">A carregar interface de auditoria...</div>;
 
   return (
     <div className="h-full flex flex-col bg-slate-50 font-sans">
@@ -321,7 +331,7 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
                         <div>
                             <h3 className="text-lg font-bold text-emerald-900 flex items-center gap-2"><FileText/> Parecer Técnico</h3>
                             <p className="text-xs text-slate-500 mt-1">
-                                Gerado em: {lastAnalysisDate ? new Date(lastAnalysisDate).toLocaleString('pt-BR') : 'Agora'}
+                                Gerado em: {lastAnalysisDate ? new Date(lastAnalysisDate).toLocaleDateString('pt-BR') : 'Agora'}
                             </p>
                         </div>
                         <div className="flex gap-2">

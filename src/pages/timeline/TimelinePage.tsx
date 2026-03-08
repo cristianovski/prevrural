@@ -4,15 +4,29 @@ import {
   Paperclip, ExternalLink, Clock, FileText, Folder
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { Client } from "../../types"; // FIX: Importação da tipagem do Cliente
 
 interface TimelinePageProps {
-  cliente: any;
+  cliente: Client; // FIX: Adeus 'any'
   onBack: () => void;
+}
+
+// FIX: Tipagem local para unificar os 3 tipos diferentes de documentos numa única lista visual
+interface UnifiedTimelineItem {
+  id: string | number;
+  type: string;
+  customName: string;
+  issueDate: string;
+  displayYear: string | number;
+  fileUrl: string | null;
+  fileName: string | null;
+  source: string;
+  law: string;
 }
 
 export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
   const [loading, setLoading] = useState(true);
-  const [timeline, setTimeline] = useState<any[]>([]);
+  const [timeline, setTimeline] = useState<UnifiedTimelineItem[]>([]); // FIX: Estado fortemente tipado
   const [filter, setFilter] = useState("");
 
   useEffect(() => {
@@ -21,46 +35,43 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
 
   const loadUnifiedTimeline = async () => {
     setLoading(true);
-    let combinedDocs: any[] = [];
+    let combinedDocs: UnifiedTimelineItem[] = [];
 
     try {
-      // 1. BUSCAR DA FICHA DE ENTREVISTA (Tabela interviews)
-      const { data: interviewData } = await supabase
-        .from('interviews')
-        .select('timeline_json')
-        .eq('client_id', cliente.id)
-        .maybeSingle();
+      // FIX: Fim do Waterfall de Fetches. As 3 consultas ocorrem em paralelo.
+      const [interviewRes, clientRes, newDocsRes] = await Promise.all([
+        supabase.from('interviews').select('timeline_json').eq('client_id', cliente.id).maybeSingle(),
+        supabase.from('clients').select('personal_docs').eq('id', cliente.id).single(),
+        supabase.from('client_documents').select('*').eq('client_id', cliente.id)
+      ]);
 
+      // 1. BUSCAR DA FICHA DE ENTREVISTA (Tabela interviews)
+      const interviewData = interviewRes.data;
       if (interviewData?.timeline_json && Array.isArray(interviewData.timeline_json)) {
-        const docsFicha = interviewData.timeline_json.map((doc: any) => ({
+        const docsFicha = interviewData.timeline_json.map((doc: Record<string, any>) => ({
           id: doc.id || Math.random().toString(),
           type: doc.type || "Registro Ficha",
-          customName: doc.description || "", // Alguns registros antigos usavam description
+          customName: doc.description || "", 
           issueDate: doc.issueDate || (doc.year ? `${doc.year}-01-01` : 'S/D'),
           displayYear: doc.year || (doc.issueDate ? doc.issueDate.split('-')[0] : "?"),
           fileUrl: doc.fileUrl || null,
           fileName: doc.fileName || null,
           source: 'Entrevista Rural',
-          law: doc.law
+          law: doc.law || ""
         }));
         combinedDocs = [...combinedDocs, ...docsFicha];
       }
 
-      // 2. BUSCAR DO CADASTRO/GED (Tabela clients)
-      const { data: clientData } = await supabase
-        .from('clients')
-        .select('personal_docs')
-        .eq('id', cliente.id)
-        .single();
-
+      // 2. BUSCAR DO CADASTRO/GED (Tabela clients - Legado)
+      const clientData = clientRes.data;
       if (clientData?.personal_docs && Array.isArray(clientData.personal_docs)) {
-        const docsCadastro = clientData.personal_docs.map((doc: any, idx: number) => ({
+        const docsCadastro = clientData.personal_docs.map((doc: Record<string, any>, idx: number) => ({
           id: `ged-${idx}`,
           type: doc.category || "Documento Pessoal",
           customName: doc.name || "Upload",
           issueDate: doc.issueDate || new Date().toISOString().split('T')[0],
           displayYear: doc.issueDate ? doc.issueDate.split('-')[0] : new Date().getFullYear(),
-          fileUrl: doc.url,
+          fileUrl: doc.url || null,
           fileName: doc.fileName || "arquivo_anexo",
           source: 'GED / Cadastro',
           law: ""
@@ -68,21 +79,17 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
         combinedDocs = [...combinedDocs, ...docsCadastro];
       }
 
-      // 3. BUSCAR DA NOVA TABELA (client_documents - Se existir no futuro)
-      const { data: newDocs } = await supabase
-        .from('client_documents')
-        .select('*')
-        .eq('client_id', cliente.id);
-
+      // 3. BUSCAR DA NOVA TABELA (client_documents)
+      const newDocs = newDocsRes.data;
       if (newDocs) {
-        const docsDb = newDocs.map((doc: any) => ({
+        const docsDb = newDocs.map((doc: Record<string, any>) => ({
           id: doc.id,
           type: doc.category || "Geral",
-          customName: doc.original_name,
+          customName: doc.title || doc.original_name || "Sem Título", // FIX: Mapeado para priorizar 'title'
           issueDate: doc.reference_date || doc.created_at,
           displayYear: new Date(doc.reference_date || doc.created_at).getFullYear(),
-          fileUrl: doc.file_url,
-          fileName: doc.original_name,
+          fileUrl: doc.file_url || null,
+          fileName: doc.title || doc.original_name || "arquivo",
           source: 'GED (Novo)',
           law: ""
         }));
@@ -98,8 +105,9 @@ export function TimelinePage({ cliente, onBack }: TimelinePageProps) {
 
       setTimeline(sorted);
 
-    } catch (err) {
-      console.error("Erro ao carregar timeline:", err);
+    } catch (err: unknown) { // FIX: Tipagem de erro segura
+      const msg = err instanceof Error ? err.message : "Erro desconhecido";
+      console.error("Erro ao carregar timeline:", msg);
     } finally {
       setLoading(false);
     }

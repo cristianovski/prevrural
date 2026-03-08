@@ -5,14 +5,7 @@ import {
   UploadCloud, X
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-
-interface Thesis {
-  id: number;
-  title: string;
-  content: string;
-  category: string;
-  active: boolean;
-}
+import { LibraryThesis } from "../../types"; // FIX: Importamos a Interface Global
 
 interface LibraryPageProps {
   onBack: () => void;
@@ -20,7 +13,7 @@ interface LibraryPageProps {
 
 export function LibraryPage({ onBack }: LibraryPageProps) {
   const [loading, setLoading] = useState(true);
-  const [theses, setTheses] = useState<Thesis[]>([]);
+  const [theses, setTheses] = useState<LibraryThesis[]>([]); // FIX: Tipagem forte
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("Todos");
 
@@ -48,7 +41,7 @@ export function LibraryPage({ onBack }: LibraryPageProps) {
       .order('title', { ascending: true });
 
     if (error) console.error(error);
-    else setTheses(data || []);
+    else setTheses((data as LibraryThesis[]) || []);
     setLoading(false);
   };
 
@@ -58,7 +51,7 @@ export function LibraryPage({ onBack }: LibraryPageProps) {
     fetchTheses();
   };
 
-  const handleEdit = (t: Thesis) => {
+  const handleEdit = (t: LibraryThesis) => {
     setEditingId(t.id);
     setFormTitle(t.title);
     setFormCategory(t.category);
@@ -95,11 +88,12 @@ export function LibraryPage({ onBack }: LibraryPageProps) {
 
           let count = 0;
           for (const item of parsed) {
-              if (item.title && item.content) {
+              const doc = item as Record<string, string>; // FIX: Tipagem de segurança para o JSON
+              if (doc.title && doc.content) {
                   await supabase.from('library_theses').insert({
-                      title: item.title,
-                      category: item.category || "Geral",
-                      content: item.content,
+                      title: doc.title,
+                      category: doc.category || "Geral",
+                      content: doc.content,
                       active: true
                   });
                   count++;
@@ -109,8 +103,9 @@ export function LibraryPage({ onBack }: LibraryPageProps) {
           setIsImportOpen(false);
           setImportJson("");
           fetchTheses();
-      } catch (err: any) {
-          alert("Erro ao ler o JSON: " + err.message);
+      } catch (err: unknown) { // FIX: Sem 'any' no catch
+          const msg = err instanceof Error ? err.message : "Erro desconhecido";
+          alert("Erro ao ler o JSON: " + msg);
       }
   };
 
@@ -225,13 +220,12 @@ export function LibraryPage({ onBack }: LibraryPageProps) {
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Categoria</label>
-                            {/* AQUI ESTÁ A CORREÇÃO: AGORA TEM A OPÇÃO MODELO */}
                             <select value={formCategory} onChange={e => setFormCategory(e.target.value)} className="w-full border border-slate-300 rounded-lg p-2.5 text-sm bg-white outline-none">
                                 <option value="Rural">Rural</option>
                                 <option value="Urbano">Urbano</option>
                                 <option value="Processual">Processual</option>
                                 <option value="Prompt Mestre">Prompt Mestre</option>
-                                <option value="Modelo">Modelo de Documento</option> {/* <--- NOVA OPÇÃO */}
+                                <option value="Modelo">Modelo de Documento</option> 
                                 <option value="Tese Avançada">Tese Avançada</option>
                             </select>
                         </div>
@@ -248,14 +242,14 @@ export function LibraryPage({ onBack }: LibraryPageProps) {
                 </div>
 
                 <div className="p-4 border-t bg-slate-50 rounded-b-2xl flex justify-end gap-2">
-                    <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-600 font-bold hover:bg-slate-200 rounded-lg text-sm">Cancelar</button>
+                    <button onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-200 rounded-lg text-sm">Cancelar</button>
                     <button onClick={handleSave} className="px-6 py-2 bg-blue-600 text-white font-bold hover:bg-blue-500 rounded-lg text-sm shadow-lg">Salvar</button>
                 </div>
             </div>
         </div>
       )}
 
-      {/* MODAL DE IMPORTAÇÃO (MANTIDO) */}
+      {/* MODAL DE IMPORTAÇÃO */}
       {isImportOpen && (
           <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
               <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl flex flex-col max-h-[90vh]">

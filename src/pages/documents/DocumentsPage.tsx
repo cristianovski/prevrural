@@ -9,30 +9,40 @@ import { supabase } from "../../lib/supabase";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { saveAs } from 'file-saver';
 import { asBlob } from 'html-docx-js-typescript';
+import { Client, LibraryThesis, OfficeProfile } from "../../types";
 
 // CHAVE API DO .ENV
 const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
-
-// MODELOS
 const MODEL_CANDIDATES = ["gemini-2.0-flash", "gemini-1.5-flash"];
 
 interface DocumentsPageProps {
-  cliente: any;
+  cliente: Client; 
   onBack: () => void;
 }
 
+interface OfficeProfileExtended extends Partial<OfficeProfile> {
+    nome_advogado?: string;
+    oab?: string;
+    endereco_profissional?: string;
+    cidade_uf?: string;
+}
+
+interface ToolBtnProps {
+    cmd: string;
+    icon: React.ElementType;
+    title?: string;
+}
+
 export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
-  const [templates, setTemplates] = useState<any[]>([]);
+  const [templates, setTemplates] = useState<LibraryThesis[]>([]); 
   const [selectedTemplateId, setSelectedTemplateId] = useState<number | null>(null);
   const [documentHtml, setDocumentHtml] = useState("");
   const [generating, setGenerating] = useState(false);
   
-  // Dados do Escritório (Multiusuário)
-  const [officeProfile, setOfficeProfile] = useState<any>(null);
+  const [officeProfile, setOfficeProfile] = useState<OfficeProfileExtended | null>(null); 
   const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [configForm, setConfigForm] = useState({ nome: "", oab: "", endereco: "", cidade: "" });
 
-  // Chat AI
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<{role: string, text: string}[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -42,11 +52,9 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    fetchTemplates();
-    fetchOfficeProfile();
+    loadAllData(); 
   }, []);
 
-  // Injeta HTML
   useEffect(() => {
     if (!generating && editorRef.current && documentHtml) {
         if (editorRef.current.innerHTML !== documentHtml) {
@@ -59,38 +67,29 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, isChatOpen]);
 
-  const fetchTemplates = async () => {
-    const { data } = await supabase
-      .from('library_theses')
-      .select('*')
-      .ilike('category', '%Modelo%')
-      .eq('active', true);
-    if (data) setTemplates(data);
-  };
+  // FIX: Supabase returns a builder, not a raw Promise. We handle them cleanly here.
+  const loadAllData = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
 
-  // --- CARREGA DADOS DO ESCRITÓRIO ---
-  const fetchOfficeProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+    const thesesPromise = supabase.from('library_theses').select('*').ilike('category', '%Modelo%').eq('active', true);
+    const officePromise = user ? supabase.from('office_profile').select('*').eq('user_id', user.id).maybeSingle() : Promise.resolve({ data: null });
 
-      const { data } = await supabase
-          .from('office_profile')
-          .select('*')
-          .eq('user_id', user.id)
-          .maybeSingle();
-      
-      if (data) {
-          setOfficeProfile(data);
-          setConfigForm({
-              nome: data.nome_advogado || "",
-              oab: data.oab || "",
-              endereco: data.endereco_profissional || "",
-              cidade: data.cidade_uf || ""
-          });
-      } else {
-          // Se não tiver perfil, abre o modal para criar
-          setIsConfigOpen(true);
-      }
+    const [thesesRes, officeRes] = await Promise.all([thesesPromise, officePromise]);
+
+    if (thesesRes?.data) setTemplates(thesesRes.data as LibraryThesis[]);
+
+    if (officeRes?.data) {
+        const data = officeRes.data as OfficeProfileExtended;
+        setOfficeProfile(data);
+        setConfigForm({
+            nome: data.nome_advogado || "",
+            oab: data.oab || "",
+            endereco: data.endereco_profissional || "",
+            cidade: data.cidade_uf || ""
+        });
+    } else if (user) {
+        setIsConfigOpen(true);
+    }
   };
 
   const handleSaveConfig = async () => {
@@ -111,7 +110,7 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
           await supabase.from('office_profile').insert(payload);
       }
       
-      await fetchOfficeProfile();
+      await loadAllData();
       setIsConfigOpen(false);
       alert("Dados do escritório salvos!");
   };
@@ -123,12 +122,14 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
               const model = genAI.getGenerativeModel({ model: modelName });
               const result = await model.generateContent(prompt);
               return result.response.text();
-          } catch (e) {}
+          } catch (e) {
+              console.warn(`Falha ao gerar com modelo ${modelName}`, e);
+          }
       }
-      throw new Error("Falha na IA.");
+      throw new Error("Falha ao comunicar com os modelos da IA.");
   };
 
-  const handleSelectTemplate = async (template: any) => {
+  const handleSelectTemplate = async (template: LibraryThesis) => {
     if (!officeProfile) {
         alert("Por favor, configure os dados do escritório (botão de engrenagem) antes de gerar documentos.");
         setIsConfigOpen(true);
@@ -181,7 +182,8 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
         setDocumentHtml(cleanHtml);
 
     } catch (error) {
-        alert("Erro ao gerar: " + error);
+        const msg = error instanceof Error ? error.message : "Erro na geração do documento.";
+        alert(msg);
     } finally {
         setGenerating(false);
     }
@@ -229,7 +231,12 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
   };
 
   const execCmd = (cmd: string, val?: string) => { document.execCommand(cmd, false, val); editorRef.current?.focus(); };
-  const ToolBtn = ({ cmd, icon: Icon, title }: any) => (<button onClick={() => execCmd(cmd)} className="p-1.5 hover:bg-slate-100 rounded text-slate-600" title={title}><Icon size={16}/></button>);
+  
+  const ToolBtn = ({ cmd, icon: Icon, title }: ToolBtnProps) => (
+      <button onClick={() => execCmd(cmd)} className="p-1.5 hover:bg-slate-100 rounded text-slate-600" title={title}>
+          <Icon size={16}/>
+      </button>
+  );
 
   return (
     <div className="flex flex-col h-full bg-slate-100 font-sans">
