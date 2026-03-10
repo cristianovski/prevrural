@@ -92,10 +92,10 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
   const [fileToUpload, setFileToUpload] = useState<File | null>(null);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   
+  // Estado do modal de upload (agora com nome livre)
   const [uploadMetadata, setUploadMetadata] = useState({ 
     category: "Provas" as ClientDocument['category'], 
-    docType: "", 
-    customName: "", 
+    customName: "", // Nome do documento (título)
     date: getLocalDateISO(), 
     userObs: ""
   });
@@ -121,7 +121,6 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
         .from('client_documents')
         .select('*')
         .eq('client_id', cliente.id)
-        // ORDENAÇÃO CRONOLÓGICA: Do mais antigo para o mais novo. Sem data vai pro final.
         .order('reference_date', { ascending: true, nullsFirst: false }); 
 
       if (error) throw error;
@@ -141,11 +140,12 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
     if (!file) return;
     
     setFileToUpload(file);
+    // Pré-preenche o nome com o nome do arquivo (sem extensão)
+    const baseName = file.name.split('.').slice(0, -1).join('.') || file.name;
     setUploadMetadata({
       category: "Provas",
-      docType: "", 
-      customName: file.name.split('.')[0], 
-      date: getLocalDateISO(), 
+      customName: baseName,
+      date: getLocalDateISO(),
       userObs: ""
     });
     setIsUploadModalOpen(true);
@@ -155,10 +155,9 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
   const confirmUpload = async () => {
     if (!fileToUpload) return;
     
-    let finalTitle = uploadMetadata.docType;
-    if (!finalTitle || finalTitle === "Outros") {
-        if (!uploadMetadata.customName.trim()) return toast({ title: "Atenção", description: "Digite o nome do documento.", variant: "destructive" });
-        finalTitle = uploadMetadata.customName;
+    const finalTitle = uploadMetadata.customName.trim();
+    if (!finalTitle) {
+      return toast({ title: "Atenção", description: "Digite o nome do documento.", variant: "destructive" });
     }
 
     setUploading(true);
@@ -207,7 +206,6 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
 
   const handleSelectDoc = (doc: ClientDocument) => {
     setSelectedDoc(doc);
-    // Verifica se o título atual faz parte das opções de alguma das listas de categorias
     const isStandard = Object.values(OPCOES_DOCUMENTOS).flat().includes(doc.title);
     setEditForm({ 
         title: isStandard ? doc.title : "Outros", 
@@ -459,7 +457,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
         )}
       </div>
 
-      {/* MODAL UPLOAD */}
+      {/* MODAL UPLOAD (agora com campo de nome livre) */}
       {isUploadModalOpen && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
@@ -472,35 +470,67 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
                         <FileText size={20} className="text-slate-500"/>
                         <p className="text-sm font-medium truncate text-slate-800 flex-1">{fileToUpload?.name}</p>
                     </div>
+                    
+                    {/* Campo Nome do Documento (obrigatório) */}
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Tipo</label>
-                        <select value={uploadMetadata.docType} onChange={e => setUploadMetadata({...uploadMetadata, docType: e.target.value})} className="w-full p-3 border rounded-xl text-sm">
-                            <option value="">-- Selecione --</option>
-                            {(OPCOES_DOCUMENTOS[uploadMetadata.category] || []).map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
-                            <option value="Outros">Outros</option>
-                        </select>
-                        {uploadMetadata.docType === "Outros" && <input value={uploadMetadata.customName} onChange={e => setUploadMetadata({...uploadMetadata, customName: e.target.value})} className="w-full mt-2 p-3 border rounded-xl text-sm" placeholder="Nome do arquivo"/>}
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">
+                            Nome do Documento <span className="text-red-500">*</span>
+                        </label>
+                        <input
+                            type="text"
+                            value={uploadMetadata.customName}
+                            onChange={(e) => setUploadMetadata({...uploadMetadata, customName: e.target.value})}
+                            className="w-full p-3 border rounded-xl text-sm"
+                            placeholder="Ex: Certidão de Casamento, ITR 2023, ..."
+                            autoFocus
+                        />
                     </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Categoria</label>
-                            <select value={uploadMetadata.category} onChange={e => setUploadMetadata({...uploadMetadata, category: e.target.value as ClientDocument['category']})} className="w-full p-3 border rounded-xl text-sm">
+                            <select 
+                                value={uploadMetadata.category} 
+                                onChange={e => setUploadMetadata({...uploadMetadata, category: e.target.value as ClientDocument['category']})} 
+                                className="w-full p-3 border rounded-xl text-sm"
+                            >
                                 <option value="Provas">Provas</option>
                                 <option value="Pessoal">Pessoal</option>
                                 <option value="Processual">Processual</option>
                                 <option value="Diversos">Diversos</option>
                             </select>
                         </div>
-                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Data</label><input type="date" value={uploadMetadata.date} onChange={e => setUploadMetadata({...uploadMetadata, date: e.target.value})} className="w-full p-3 border rounded-xl text-sm"/></div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Data</label>
+                            <input 
+                                type="date" 
+                                value={uploadMetadata.date} 
+                                onChange={e => setUploadMetadata({...uploadMetadata, date: e.target.value})} 
+                                className="w-full p-3 border rounded-xl text-sm"
+                            />
+                        </div>
                     </div>
                     <div>
-                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1"><MessageSquare size={12}/> Observações</label>
-                        <textarea value={uploadMetadata.userObs} onChange={e => setUploadMetadata({...uploadMetadata, userObs: e.target.value})} className="w-full p-3 border border-slate-200 rounded-xl text-sm resize-none" rows={2}/>
+                        <label className="text-xs font-bold text-slate-500 uppercase mb-1 flex items-center gap-1">
+                            <MessageSquare size={12}/> Observações
+                        </label>
+                        <textarea 
+                            value={uploadMetadata.userObs} 
+                            onChange={e => setUploadMetadata({...uploadMetadata, userObs: e.target.value})} 
+                            className="w-full p-3 border border-slate-200 rounded-xl text-sm resize-none" 
+                            rows={2}
+                        />
                     </div>
                 </div>
                 <div className="p-4 bg-slate-50 border-t flex gap-3 justify-end">
                     <button onClick={() => setIsUploadModalOpen(false)} className="px-4 py-2 text-slate-500 font-bold hover:bg-slate-200 rounded-lg text-sm">Cancelar</button>
-                    <button onClick={confirmUpload} disabled={uploading} className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm shadow-lg flex items-center gap-2">{uploading ? "Enviando..." : <><Check size={16}/> Confirmar</>}</button>
+                    <button 
+                        onClick={confirmUpload} 
+                        disabled={uploading || !uploadMetadata.customName.trim()} 
+                        className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg text-sm shadow-lg flex items-center gap-2 disabled:opacity-50"
+                    >
+                        {uploading ? "Enviando..." : <><Check size={16}/> Confirmar</>}
+                    </button>
                 </div>
             </div>
         </div>
