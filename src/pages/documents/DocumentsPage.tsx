@@ -6,14 +6,14 @@ import {
   Settings, Save
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { generateWithFallback } from "../../lib/aiService";
 import { saveAs } from 'file-saver';
 import { asBlob } from 'html-docx-js-typescript';
 import { Client, LibraryThesis, OfficeProfile } from "../../types";
 
-// CHAVE API DO .ENV
-const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
-const MODEL_CANDIDATES = ["gemini-2.0-flash", "gemini-1.5-flash"];
+// CHAVE API DO .ENV - NÃO É MAIS NECESSÁRIA AQUI
+// const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+// const MODEL_CANDIDATES = ["gemini-2.0-flash", "gemini-1.5-flash"];
 
 interface DocumentsPageProps {
   cliente: Client; 
@@ -113,20 +113,6 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
       await loadAllData();
       setIsConfigOpen(false);
       alert("Dados do escritório salvos!");
-  };
-
-  const generateWithFallback = async (prompt: string) => {
-      const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-      for (const modelName of MODEL_CANDIDATES) {
-          try {
-              const model = genAI.getGenerativeModel({ model: modelName });
-              const result = await model.generateContent(prompt);
-              return result.response.text();
-          } catch (e) {
-              console.warn(`Falha ao gerar com modelo ${modelName}`, e);
-          }
-      }
-      throw new Error("Falha ao comunicar com os modelos da IA.");
   };
 
   const handleSelectTemplate = async (template: LibraryThesis) => {

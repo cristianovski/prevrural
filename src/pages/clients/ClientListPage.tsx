@@ -26,9 +26,9 @@ export function ClientListPage() {
         .order('created_at', { ascending: false });
         
       if (error) throw error;
-      if (data) setClients(data as Client[]); // FIX: Garantia de tipagem estrita no retorno da BD
+      if (data) setClients(data as Client[]); 
       
-    } catch (err: unknown) { // FIX: Prevenção contra falhas de rede silenciosas
+    } catch (err: unknown) { 
       const msg = err instanceof Error ? err.message : "Erro desconhecido ao carregar clientes";
       console.error("Falha na listagem:", msg);
       alert("Não foi possível carregar a lista de clientes. Verifique a sua ligação.");
@@ -37,7 +37,6 @@ export function ClientListPage() {
     }
   };
 
-  // FIX: Uso de Optional Chaining (?.) para um código mais limpo e seguro contra dados corrompidos
   const filteredClients = clients.filter(c => {
     const search = searchTerm.toLowerCase();
     return (
@@ -143,6 +142,4 @@ export function ClientListPage() {
       </main>
     </div>
   );
-}git add .
-git commit -m "Refatoração Fase 5: Tipagens estritas, remoção de 'any' e otimização de performance no Dashboard, Documentos e Relatórios"
-git push origin main
+}

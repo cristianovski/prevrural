@@ -1,4 +1,4 @@
-// JULES_WRITE_TEST_V1: O sistema esta gravando arquivos corretamente.
+// src/App.tsx
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { supabase } from './lib/supabase';
@@ -15,17 +15,19 @@ import { ClientListPage } from './pages/clients/ClientListPage';
 import { ClientFormPage } from './pages/clients/ClientFormPage';
 import { AnalysisPage } from './pages/analysis/AnalysisPage';
 import { LegalOpinionPage } from './pages/clients/LegalOpinionPage';
-import { MasterReportPage } from './pages/analysis/MasterReportPage'; // Dossiê
+import { MasterReportPage } from './pages/analysis/MasterReportPage';
 import { TimelinePage } from './pages/timeline/TimelinePage';
 import { ClientDocumentsManager } from './pages/documents/ClientDocumentsManager';
 import { ProcuracaoPrint } from './pages/documents/ProcuracaoPrint';
-import { DocumentsPage } from './pages/documents/DocumentsPage'; // Editor
+import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { LibraryPage } from './pages/admin/LibraryPage';
 import { LawyersPage } from './pages/admin/LawyersPage';
 
+// Novas páginas financeiras
+import { ClientFinancePage } from './pages/finance/ClientFinancePage';
+import { CashFlowPage } from './pages/finance/CashFlowPage';
+
 // --- WRAPPER DE CARREGAMENTO DE CLIENTE ---
-// Este componente intermediário busca os dados do cliente com base no ID da URL
-// e passa para os componentes que esperam receber o objeto "cliente" pronto.
 function ClientLoader({ Component }: { Component: any }) {
   const { id } = useParams();
   const [client, setClient] = useState<any>(null);
@@ -58,8 +60,8 @@ function ClientLoader({ Component }: { Component: any }) {
 
   return <Component 
     cliente={client} 
-    clienteId={client?.id} // Compatibilidade com componentes que usam clienteId
-    clientId={client?.id}  // Compatibilidade com componentes que usam clientId
+    clienteId={client?.id}
+    clientId={client?.id}
     onBack={() => window.history.back()} 
   />;
 }
@@ -95,6 +97,10 @@ function App() {
             {/* Admin */}
             <Route path="biblioteca" element={<LibraryPage onBack={() => window.history.back()} />} />
             <Route path="advogados" element={<LawyersPage onBack={() => window.history.back()} />} />
+
+            {/* NOVAS ROTAS FINANCEIRAS */}
+            <Route path="cliente/:id/financeiro" element={<ClientLoader Component={ClientFinancePage} />} />
+            <Route path="fluxo-caixa" element={<CashFlowPage />} />
           </Route>
         </Route>
         

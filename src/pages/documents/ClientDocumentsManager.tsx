@@ -6,21 +6,69 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { useToast } from "../../hooks/use-toast";
-import { getLocalDateISO } from "../../lib/utils"; // FIX: Importação da função global de datas
+import { getLocalDateISO } from "../../lib/utils"; 
 import { Client, ClientDocument } from "../../types"; 
 
-// Base jurídica
+// --- NOVA ESTRUTURA DE CATEGORIAS ---
+const OPCOES_DOCUMENTOS: Record<string, string[]> = {
+  'Pessoal': [
+    'Documento de Identificação (RG/CNH)',
+    'CPF',
+    'Comprovante de Endereço',
+    'Certidão de Casamento / Nascimento',
+    'Outros Documentos Pessoais'
+  ],
+  'Provas': [
+    'Autodeclaração do Segurado Especial',
+    'Contratos Rurais (Arrendamento, parceria, meação, comodato)',
+    'DAP / CAF',
+    'Comprovantes de Venda / Notas Fiscais (Bloco de Notas)',
+    'Comprovante de Recolhimento (Funrural/GPS)',
+    'Imposto de Renda Rural (IRPF)',
+    'Documentos de Terra e Posse (INCRA, ITR, DIAC/DIAT, Escritura)',
+    'Certidão FUNAI',
+    'Documentos Civis (com indicação de profissão rural)',
+    'Documentos Eleitorais (Ficha de cadastro, Certidão)',
+    'Documentos Militares (Alistamento, Quitação)',
+    'Documentos Escolares (Matrícula, boletim em escola rural)',
+    'Documentos de Saúde (Posto de saúde, vacinação, gestante)',
+    'Associações e Sindicatos (Ficha, recibos de contribuição)',
+    'Insumos e Crédito (Recibos agrícolas, empréstimo rural)',
+    'Programas do Governo (Emater, assistência técnica)',
+    'Registros Diversos (Processos judiciais, religiosas, comunitárias)'
+  ],
+  'Processual': [
+    'Procuração',
+    'Contrato de Honorários',
+    'Declaração de Hipossuficiência',
+    'Termo de Renúncia',
+    'Petição Inicial',
+    'Outros Documentos Processuais'
+  ],
+  'Diversos': [
+    'Outros'
+  ]
+};
+
+// --- BASE JURÍDICA ATUALIZADA (Sincronizada com as Provas) ---
 const LEGAL_BASIS: Record<string, { law: string, obs: string }> = {
-  "Autodeclaração do Segurado Especial": { law: "Lei 8.213/91, Art. 38-B, § 2º", obs: "Principal instrumento de prova." },
-  "Bloco de Notas do Produtor Rural": { law: "Lei 8.213/91, Art. 106, V", obs: "Prova robusta de comercialização." },
-  "Certidão de Casamento/União Estável": { law: "Súmula 6 TNU", obs: "Estende a profissão do cônjuge." },
-  "Certidão de Nascimento/Batismo Filhos": { law: "IN 128/2022, Art. 116, XII", obs: "Prova presença rural na data do evento." },
-  "DAP ou CAF (Pronaf)": { law: "Lei 8.213/91, Art. 106, IV", obs: "Forte instrumento ratificador." },
-  "ITR ou CCIR": { law: "Tema 1115 STJ", obs: "Prova posse da terra." },
-  "Notas Fiscais de Entrada": { law: "Lei 8.213/91, Art. 106, VI", obs: "Prova venda da produção." },
-  "Ficha de Sindicato / Cooperativa": { law: "IN 128/2022, Art. 116, XVIII", obs: "Início de prova material." },
-  "Documentos Escolares": { law: "IN 128/2022, Art. 116, XVII", obs: "Escola rural ou profissão dos pais." },
-  "Outros": { law: "Súmula 149 STJ", obs: "Admite-se qualquer meio de prova idôneo." }
+  "Autodeclaração do Segurado Especial": { law: "Lei 8.213/91, Art. 38-B, § 2º; IN 128/2022, Art. 115", obs: "Prova central, devendo ser ratificada." },
+  "Contratos Rurais (Arrendamento, parceria, meação, comodato)": { law: "Lei 8.213/91, Art. 106, II; IN 128/2022, Art. 116, I", obs: "Válidos a partir do registro/reconhecimento de firma." },
+  "DAP / CAF": { law: "Lei 8.213/91, Art. 106, IV; IN 128/2022, Art. 116, II", obs: "Forte instrumento ratificador." },
+  "Comprovantes de Venda / Notas Fiscais (Bloco de Notas)": { law: "Lei 8.213/91, Art. 106, V a VII; IN 128/2022, Art. 116, III a V", obs: "Prova robusta de comercialização da produção." },
+  "Comprovante de Recolhimento (Funrural/GPS)": { law: "Lei 8.213/91, Art. 106, VIII; IN 128/2022, Art. 116, VI", obs: "Decorrência da comercialização." },
+  "Imposto de Renda Rural (IRPF)": { law: "Lei 8.213/91, Art. 106, IX; IN 128/2022, Art. 116, VII", obs: "Com indicação de renda proveniente da área rural." },
+  "Documentos de Terra e Posse (INCRA, ITR, DIAC/DIAT, Escritura)": { law: "Lei 8.213/91, Art. 106, X; IN 128/2022, Art. 116, VIII, IX, XXI", obs: "Prova a posse ou propriedade da terra." },
+  "Certidão FUNAI": { law: "IN 128/2022, Art. 116, X", obs: "Certifica a condição do índio como trabalhador rural." },
+  "Documentos Civis (com indicação de profissão rural)": { law: "IN 128/2022, Art. 116, XI a XIII; Súmula 32 AGU", obs: "Certidão de casamento, nascimento, batismo, tutela." },
+  "Documentos Eleitorais (Ficha de cadastro, Certidão)": { law: "IN 128/2022, Art. 116, XV", obs: "Deve constar a profissão rural." },
+  "Documentos Militares (Alistamento, Quitação)": { law: "IN 128/2022, Art. 116, XVI", obs: "Início de prova material." },
+  "Documentos Escolares (Matrícula, boletim em escola rural)": { law: "IN 128/2022, Art. 116, XVII", obs: "Do próprio trabalhador ou dos filhos." },
+  "Documentos de Saúde (Posto de saúde, vacinação, gestante)": { law: "IN 128/2022, Art. 116, XXIV e XXV", obs: "Fichas de hospitais, postos ou agentes comunitários." },
+  "Associações e Sindicatos (Ficha, recibos de contribuição)": { law: "IN 128/2022, Art. 116, XVIII, XXIX e XXX", obs: "Registros continuam valendo como prova indireta." },
+  "Insumos e Crédito (Recibos agrícolas, empréstimo rural)": { law: "IN 128/2022, Art. 116, XXVII e XXVIII", obs: "Compra de implementos ou financiamento rural." },
+  "Programas do Governo (Emater, assistência técnica)": { law: "IN 128/2022, Art. 116, XIX e XX", obs: "Participação em programas governamentais rurais." },
+  "Registros Diversos (Processos judiciais, religiosas, comunitárias)": { law: "IN 128/2022, Art. 116, XXIII, XXXI a XXXIII", obs: "Atuação como parte/testemunha, publicações, igrejas." }
 };
 
 interface PageProps {
@@ -48,7 +96,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
     category: "Provas" as ClientDocument['category'], 
     docType: "", 
     customName: "", 
-    date: getLocalDateISO(), // FIX: Uso da utilitária global
+    date: getLocalDateISO(), 
     userObs: ""
   });
 
@@ -73,12 +121,13 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
         .from('client_documents')
         .select('*')
         .eq('client_id', cliente.id)
-        .order('reference_date', { ascending: false });
+        // ORDENAÇÃO CRONOLÓGICA: Do mais antigo para o mais novo. Sem data vai pro final.
+        .order('reference_date', { ascending: true, nullsFirst: false }); 
 
       if (error) throw error;
       setDocs(data as ClientDocument[]); 
 
-    } catch (error: unknown) { // FIX: Tipagem de erro corrigida
+    } catch (error: unknown) { 
       const msg = error instanceof Error ? error.message : "Erro desconhecido";
       console.error("Erro ao buscar docs:", error);
       toast({ title: "Erro", description: msg, variant: "destructive" });
@@ -96,7 +145,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
       category: "Provas",
       docType: "", 
       customName: file.name.split('.')[0], 
-      date: getLocalDateISO(), // FIX: Uso da utilitária global
+      date: getLocalDateISO(), 
       userObs: ""
     });
     setIsUploadModalOpen(true);
@@ -148,7 +197,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
         setFileToUpload(null);
         fetchDocuments(); 
 
-    } catch (error: unknown) { // FIX: Tipagem de erro corrigida
+    } catch (error: unknown) { 
         const msg = error instanceof Error ? error.message : "Erro desconhecido no upload";
         toast({ title: "Erro no upload", description: msg, variant: "destructive" });
     } finally {
@@ -158,7 +207,8 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
 
   const handleSelectDoc = (doc: ClientDocument) => {
     setSelectedDoc(doc);
-    const isStandard = Object.keys(LEGAL_BASIS).includes(doc.title);
+    // Verifica se o título atual faz parte das opções de alguma das listas de categorias
+    const isStandard = Object.values(OPCOES_DOCUMENTOS).flat().includes(doc.title);
     setEditForm({ 
         title: isStandard ? doc.title : "Outros", 
         customTitle: isStandard ? "" : doc.title, 
@@ -207,7 +257,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
               description: editForm.description 
           }) : null);
 
-      } catch (error: unknown) { // FIX: Tipagem de erro corrigida
+      } catch (error: unknown) { 
           const msg = error instanceof Error ? error.message : "Erro desconhecido";
           toast({ title: "Erro", description: msg, variant: "destructive" });
       } finally {
@@ -232,7 +282,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
           setSelectedDoc(null);
           fetchDocuments();
 
-      } catch (error: unknown) { // FIX: Tipagem de erro corrigida
+      } catch (error: unknown) { 
           const msg = error instanceof Error ? error.message : "Erro desconhecido ao excluir";
           toast({ title: "Erro", description: msg, variant: "destructive" });
       } finally {
@@ -360,7 +410,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
                                 <div className="relative">
                                     <select disabled={!isEditing} value={editForm.title} onChange={e => setEditForm({...editForm, title: e.target.value})} className="w-full p-2 border rounded-lg text-sm bg-white appearance-none disabled:bg-slate-50">
                                         <option value="">Selecione...</option>
-                                        {Object.keys(LEGAL_BASIS).map((key, i) => <option key={i} value={key}>{key}</option>)}
+                                        {(OPCOES_DOCUMENTOS[editForm.category] || []).map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
                                         <option value="Outros">Outros</option>
                                     </select>
                                     <ChevronDown size={14} className="absolute right-3 top-3 text-slate-400 pointer-events-none"/>
@@ -426,13 +476,21 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
                         <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Tipo</label>
                         <select value={uploadMetadata.docType} onChange={e => setUploadMetadata({...uploadMetadata, docType: e.target.value})} className="w-full p-3 border rounded-xl text-sm">
                             <option value="">-- Selecione --</option>
-                            {Object.keys(LEGAL_BASIS).map((key, i) => <option key={i} value={key}>{key}</option>)}
+                            {(OPCOES_DOCUMENTOS[uploadMetadata.category] || []).map((opt, i) => <option key={i} value={opt}>{opt}</option>)}
                             <option value="Outros">Outros</option>
                         </select>
                         {uploadMetadata.docType === "Outros" && <input value={uploadMetadata.customName} onChange={e => setUploadMetadata({...uploadMetadata, customName: e.target.value})} className="w-full mt-2 p-3 border rounded-xl text-sm" placeholder="Nome do arquivo"/>}
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Categoria</label><select value={uploadMetadata.category} onChange={e => setUploadMetadata({...uploadMetadata, category: e.target.value as ClientDocument['category']})} className="w-full p-3 border rounded-xl text-sm"><option value="Provas">Provas</option><option value="Pessoal">Pessoal</option><option value="Diversos">Diversos</option></select></div>
+                        <div>
+                            <label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Categoria</label>
+                            <select value={uploadMetadata.category} onChange={e => setUploadMetadata({...uploadMetadata, category: e.target.value as ClientDocument['category']})} className="w-full p-3 border rounded-xl text-sm">
+                                <option value="Provas">Provas</option>
+                                <option value="Pessoal">Pessoal</option>
+                                <option value="Processual">Processual</option>
+                                <option value="Diversos">Diversos</option>
+                            </select>
+                        </div>
                         <div><label className="text-xs font-bold text-slate-500 uppercase mb-1 block">Data</label><input type="date" value={uploadMetadata.date} onChange={e => setUploadMetadata({...uploadMetadata, date: e.target.value})} className="w-full p-3 border rounded-xl text-sm"/></div>
                     </div>
                     <div>

@@ -1,25 +1,17 @@
+// src/pages/clients/LegalOpinionPage.tsx
 import { useState, useEffect } from "react";
 import { 
   ArrowLeft, BrainCircuit, CheckCircle, AlertTriangle, 
   XCircle, FileText, Calculator, FolderOpen, BookOpen, Sparkles, Save,
-  Activity, Heart
+  Activity, Heart, Calendar, Eye, AlertCircle
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { analisarViabilidade, AnalysisResult, calcularIdade, ClientData } from "../../utils/benefitRules"; 
-import { gerarParecerIA } from "../../lib/aiService"; 
-// FIX: Tipagens rigorosas e função de fuso horário importadas
-import { Client, LibraryThesis } from "../../types"; 
-import { getLocalDateISO } from "../../lib/utils";
+import { analisarViabilidade, AnalysisResult, ClientData } from "../../utils/benefitRules"; 
+import { useToast } from "../../hooks/use-toast";
 
 interface LegalOpinionPageProps {
   clientId: number;
   onBack: () => void;
-}
-
-// FIX: Estendemos o tipo Client para incluir os campos específicos de IA sem alterar a interface global
-interface ClientWithOpinion extends Client {
-    parecer_ia?: string;
-    data_ultima_analise?: string;
 }
 
 const BENEFIT_TYPES = [
@@ -32,17 +24,25 @@ const BENEFIT_TYPES = [
 ];
 
 export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
-  // FIX: Adeus 'any'. Tipagem forte aplicada.
-  const [client, setClient] = useState<ClientWithOpinion | null>(null);
+  const { toast } = useToast();
+  const [client, setClient] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [parecerIA, setParecerIA] = useState("");
   const [lastAnalysisDate, setLastAnalysisDate] = useState<string | null>(null);
   
-  // FIX: Tipagem forte para as teses
-  const [theses, setTheses] = useState<LibraryThesis[]>([]);
+  // Documentos
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
+  const [failedDocs, setFailedDocs] = useState<string[]>([]);
+  const [ocrTexts, setOcrTexts] = useState<Record<string, string>>({});
+  const [showOcr, setShowOcr] = useState<string | null>(null);
+  
+  // Teses da Biblioteca
+  const [theses, setTheses] = useState<any[]>([]);
   const [selectedThesisId, setSelectedThesisId] = useState<string>("");
 
+  // Entradas Manuais para o Simulador
   const [tempoRural, setTempoRural] = useState(15); 
   const [tempoUrbano, setTempoUrbano] = useState(0);
   const [selectedBenefit, setSelectedBenefit] = useState(BENEFIT_TYPES[0]);
@@ -55,121 +55,168 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
     idade_conjuge_obito: 0
   });
 
-  const [docsChecklist, setDocsChecklist] = useState({
-    certidao_casamento: false,
-    historico_escolar: false,
-    certidao_nascimento_filhos: false,
-    itr_incra: false,
-    bloco_notas: false,
-    declaracao_sindicato: false,
-    autodeclaracao: false,
-    outros: false
-  });
-
   const [resultado, setResultado] = useState<AnalysisResult | null>(null);
 
+  // Buscar dados iniciais
   useEffect(() => {
-    loadAllData();
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([
+        fetchClientData(),
+        fetchTheses(),
+        fetchDocuments()
+      ]);
+      setLoading(false);
+    };
+    loadData();
   }, [clientId]);
 
+  // Recalcular viabilidade quando os parâmetros mudarem
   useEffect(() => {
     if (client) {
       const dadosAnalise: ClientData = {
         sexo: client.sexo || 'Masculino',
-        data_nascimento: client.data_nascimento || "",
-        profissao: client.profissao || "Rural",
-        possui_cnpj: client.possui_cnpj || false,
-        possui_outra_renda: client.possui_outra_renda || false,
+        data_nascimento: client.data_nascimento,
+        profissao: client.profissao,
+        possui_cnpj: client.possui_cnpj,
+        possui_outra_renda: client.possui_outra_renda,
         tempo_rural_anos: tempoRural,
         tempo_urbano_anos: tempoUrbano,
-        ...extraParams 
+        ...extraParams
       };
-
       const analise = analisarViabilidade(selectedBenefit, dadosAnalise);
       setResultado(analise);
     }
   }, [client, selectedBenefit, tempoRural, tempoUrbano, extraParams]);
 
-  // FIX: Fim do Network Waterfall. Consultamos Cliente e Teses em paralelo.
-  const loadAllData = async () => {
-    setLoading(true);
-    try {
-        const [clientRes, thesesRes] = await Promise.all([
-            supabase.from('clients').select('*').eq('id', clientId).single(),
-            supabase.from('library_theses').select('id, title, content, category').eq('active', true).order('title')
-        ]);
-
-        if (clientRes.data) {
-            const data = clientRes.data as ClientWithOpinion;
-            setClient(data);
-            if (data.parecer_ia) {
-                setParecerIA(data.parecer_ia);
-                setLastAnalysisDate(data.data_ultima_analise || null);
-            }
+  const fetchClientData = async () => {
+    const { data } = await supabase.from('clients').select('*').eq('id', clientId).single();
+    if (data) {
+        setClient(data);
+        if (data.parecer_ia) {
+            setParecerIA(data.parecer_ia);
+            setLastAnalysisDate(data.data_ultima_analise);
         }
-
-        if (thesesRes.data && thesesRes.data.length > 0) {
-            const fetchedTheses = thesesRes.data as LibraryThesis[];
-            setTheses(fetchedTheses);
-            setSelectedThesisId(fetchedTheses[0].id.toString());
-        }
-    } catch (error) {
-        console.error("Erro ao carregar dados:", error);
-    } finally {
-        setLoading(false);
     }
   };
 
-  const toggleDoc = (key: keyof typeof docsChecklist) => {
-      setDocsChecklist(prev => ({...prev, [key]: !prev[key]}));
+  const fetchTheses = async () => {
+      const { data } = await supabase
+        .from('library_theses')
+        .select('id, title, content, category')
+        .eq('active', true)
+        .order('title');
+      
+      if (data && data.length > 0) {
+          setTheses(data);
+          setSelectedThesisId(data[0].id.toString());
+      }
+  };
+
+  const fetchDocuments = async () => {
+    const { data } = await supabase
+      .from('client_documents')
+      .select('*')
+      .eq('client_id', clientId)
+      .eq('category', 'Provas')
+      .order('reference_date', { ascending: false });
+    
+    if (data) {
+      setDocuments(data);
+      // Buscar cache de OCR para esses documentos
+      const ids = data.map(d => d.id);
+      const { data: cache } = await supabase
+        .from('document_ocr_cache')
+        .select('document_id, extracted_text')
+        .in('document_id', ids);
+      
+      if (cache) {
+        const ocrMap: Record<string, string> = {};
+        cache.forEach(item => { ocrMap[item.document_id] = item.extracted_text; });
+        setOcrTexts(ocrMap);
+      }
+    }
+  };
+
+  const toggleDoc = (docId: string) => {
+    setSelectedDocs(prev => 
+      prev.includes(docId) ? prev.filter(id => id !== docId) : [...prev, docId]
+    );
   };
 
   const handleGenerateOpinion = async () => {
-      if (!client) return;
-      if (!selectedThesisId) return alert("Por favor, selecione uma Tese na lista antes de gerar.");
+    console.log("1️⃣ Iniciando geração de parecer");
+    
+    if (!client) {
+      console.log("❌ Cliente não encontrado");
+      return;
+    }
+    if (!selectedThesisId) {
+      toast({ title: "Atenção", description: "Selecione uma tese da biblioteca.", variant: "destructive" });
+      return;
+    }
 
-      setGenerating(true);
-      
-      try {
-          const teseSelecionada = theses.find(t => t.id.toString() === selectedThesisId);
-          const conteudoTese = teseSelecionada ? teseSelecionada.content : "Lei Geral";
+    setGenerating(true);
+    setFailedDocs([]);
+    
+    try {
+      console.log("2️⃣ Preparando requisição para função");
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analisar-documentos`;
+      console.log("URL:", url);
 
-          const dadosCompletos = {
-              ...client,
-              idade_calculada: calcularIdade(client.data_nascimento || ""),
-              docs_checklist: docsChecklist,
-              beneficio_alvo: selectedBenefit,
-              detalhes_beneficio: extraParams 
-          };
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          clientId,
+          thesisId: selectedThesisId,
+          documentIds: selectedDocs
+        })
+      });
 
-          const textoGerado = await gerarParecerIA(dadosCompletos, conteudoTese);
-          setParecerIA(textoGerado);
-          
-          // FIX: Utilizamos a função getLocalDateISO para manter o fuso horário correto
-          const now = getLocalDateISO();
-          const { error } = await supabase
-            .from('clients')
-            .update({ 
-                parecer_ia: textoGerado,
-                data_ultima_analise: now
-            })
-            .eq('id', clientId);
+      console.log("3️⃣ Resposta recebida, status:", response.status);
 
-          if (error) console.error("Erro ao salvar:", error);
-          else setLastAnalysisDate(now);
-
-      } catch (err: unknown) { // FIX: Tipagem de erro corrigida
-          const msg = err instanceof Error ? err.message : "Erro desconhecido ao comunicar com a IA.";
-          alert("Erro ao gerar: " + msg);
-      } finally {
-          setGenerating(false);
+      if (!response.ok) {
+        // Tenta obter o texto do erro (pode ser JSON ou HTML)
+        const errorText = await response.text();
+        console.log("4️⃣ Resposta de erro (texto):", errorText);
+        throw new Error(`Erro ${response.status}: ${errorText.substring(0, 200)}`);
       }
+
+      console.log("5️⃣ Resposta OK, lendo JSON...");
+      const data = await response.json();
+      console.log("6️⃣ JSON lido com sucesso");
+
+      setParecerIA(data.parecer);
+      setFailedDocs(data.failedDocs || []);
+      setLastAnalysisDate(new Date().toISOString());
+      
+      toast({ title: "Sucesso", description: "Parecer gerado com IA.", variant: "success" });
+      
+      console.log("8️⃣ Recarregando documentos...");
+      await fetchDocuments();
+
+    } catch (err: any) {
+      console.error("❌ Erro capturado:", err);
+      console.error("Stack do erro:", err?.stack);
+      toast({ 
+        title: "Erro", 
+        description: err?.message || "Erro ao gerar parecer. Verifique o console.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setGenerating(false);
+      console.log("9️⃣ Finalizado");
+    }
   };
 
   const showDII = selectedBenefit.toLowerCase().includes("incapacidade");
   const showPensao = selectedBenefit.toLowerCase().includes("pensão") || selectedBenefit.toLowerCase().includes("morte");
 
-  if (loading || !client) return <div className="p-8 text-center text-slate-500 font-bold">A carregar interface de auditoria...</div>;
+  if (loading) return <div className="p-8 text-center text-slate-500">Carregando dados...</div>;
 
   return (
     <div className="h-full flex flex-col bg-slate-50 font-sans">
@@ -179,7 +226,7 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
            <h1 className="text-lg font-bold text-slate-800 flex items-center gap-2">
              <BrainCircuit className="text-purple-600"/> Análise IA & Viabilidade
            </h1>
-           <p className="text-xs text-slate-500">Versão 3.0 • Multibenefícios</p>
+           <p className="text-xs text-slate-500">Versão DeepSeek • Documentos analisados</p>
         </div>
       </header>
 
@@ -188,8 +235,8 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
         {/* DADOS BÁSICOS */}
         <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
             <div>
-                <h2 className="text-xl font-bold text-slate-800">{client.nome}</h2>
-                <p className="text-slate-500 text-sm">CPF: {client.cpf} • {client.profissao}</p>
+                <h2 className="text-xl font-bold text-slate-800">{client?.nome}</h2>
+                <p className="text-slate-500 text-sm">CPF: {client?.cpf} • {client?.profissao}</p>
             </div>
             <select 
                 value={selectedBenefit}
@@ -208,7 +255,6 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
                  <Calculator size={16}/> 1. Requisitos Objetivos
              </h3>
              
-             {/* CAMPOS PADRÃO */}
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                  <div>
                      <label className="text-xs font-bold text-slate-600 mb-1 block">Tempo Rural (Anos)</label>
@@ -220,7 +266,6 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
                  </div>
              </div>
 
-             {/* CAMPOS DINÂMICOS (INCAPACIDADE / PENSÃO) */}
              {(showDII || showPensao) && (
                 <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 animate-in fade-in">
                     <h4 className="text-xs font-bold text-slate-500 uppercase mb-3 flex items-center gap-2">
@@ -276,23 +321,55 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
              )}
         </section>
 
-        {/* 2. DOCUMENTOS */}
+        {/* 2. DOCUMENTOS DO GED */}
         <section className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
-             <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><FolderOpen size={16}/> 2. Prova Material (Checklist)</h3>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                 {[
-                     { id: 'certidao_casamento', label: 'Certidão Casamento/Nasc.' },
-                     { id: 'itr_incra', label: 'ITR / CCIR / INCRA' },
-                     { id: 'bloco_notas', label: 'Bloco de Notas / Produção' },
-                     { id: 'declaracao_sindicato', label: 'Sindicato / Autodeclaração' },
-                     { id: 'historico_escolar', label: 'Histórico Escolar' },
-                     { id: 'outros', label: 'Outros Indícios de Prova' }
-                 ].map(doc => (
-                     <label key={doc.id} className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all ${docsChecklist[doc.id as keyof typeof docsChecklist] ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-200' : 'bg-white border-slate-200 hover:border-slate-300'}`}>
-                         <input type="checkbox" checked={docsChecklist[doc.id as keyof typeof docsChecklist]} onChange={() => toggleDoc(doc.id as keyof typeof docsChecklist)} className="accent-emerald-600 w-4 h-4"/>
-                         <span className="text-sm font-medium text-slate-700">{doc.label}</span>
-                     </label>
-                 ))}
+             <h3 className="text-sm font-bold text-slate-500 uppercase mb-4 flex items-center gap-2"><FolderOpen size={16}/> 2. Provas do GED</h3>
+             <p className="text-xs text-slate-400 mb-3">Selecione os documentos que deseja incluir na análise da IA. Os textos extraídos serão usados como fatos.</p>
+             
+             {failedDocs.length > 0 && (
+               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 flex items-start gap-2">
+                 <AlertCircle size={16} className="shrink-0 mt-0.5"/>
+                 <div>
+                   <span className="font-bold">Falha ao processar:</span> {failedDocs.join(", ")}. Verifique o formato ou tente novamente.
+                 </div>
+               </div>
+             )}
+
+             <div className="space-y-2 max-h-80 overflow-y-auto border rounded-lg p-2">
+               {documents.length === 0 ? (
+                 <p className="text-center text-slate-400 py-4">Nenhum documento na categoria Provas.</p>
+               ) : (
+                 documents.map(doc => (
+                   <div key={doc.id} className="flex items-start gap-3 p-2 hover:bg-slate-50 rounded-lg border-b last:border-0">
+                     <input
+                       type="checkbox"
+                       checked={selectedDocs.includes(doc.id)}
+                       onChange={() => toggleDoc(doc.id)}
+                       className="mt-1"
+                     />
+                     <FileText size={16} className="text-slate-400 mt-1"/>
+                     <div className="flex-1">
+                       <div className="flex justify-between">
+                         <span className="text-sm font-medium">{doc.title}</span>
+                         <span className="text-xs text-slate-400">{doc.reference_date ? doc.reference_date.split('-').reverse().join('/') : 'S/D'}</span>
+                       </div>
+                       {ocrTexts[doc.id] && (
+                         <button
+                           onClick={() => setShowOcr(showOcr === doc.id ? null : doc.id)}
+                           className="text-xs text-blue-600 hover:underline mt-1 flex items-center gap-1"
+                         >
+                           <Eye size={12}/> {showOcr === doc.id ? 'Ocultar texto extraído' : 'Ver texto extraído'}
+                         </button>
+                       )}
+                       {showOcr === doc.id && ocrTexts[doc.id] && (
+                         <div className="mt-2 p-2 bg-slate-100 rounded text-xs max-h-40 overflow-y-auto whitespace-pre-wrap">
+                           {ocrTexts[doc.id]}
+                         </div>
+                       )}
+                     </div>
+                   </div>
+                 ))
+               )}
              </div>
         </section>
 
@@ -331,7 +408,7 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
                         <div>
                             <h3 className="text-lg font-bold text-emerald-900 flex items-center gap-2"><FileText/> Parecer Técnico</h3>
                             <p className="text-xs text-slate-500 mt-1">
-                                Gerado em: {lastAnalysisDate ? new Date(lastAnalysisDate).toLocaleDateString('pt-BR') : 'Agora'}
+                                Gerado em: {lastAnalysisDate ? new Date(lastAnalysisDate).toLocaleString('pt-BR') : 'Agora'}
                             </p>
                         </div>
                         <div className="flex gap-2">

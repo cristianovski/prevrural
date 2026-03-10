@@ -5,11 +5,11 @@ import {
   User, CheckCircle, AlertTriangle 
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { gerarResumoIA } from "../../lib/aiService";
 import { Client, Interview, Period, OfficeProfile } from "../../types";
 
-// CHAVE API DO .ENV
-const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
+// CHAVE API DO .ENV - NÃO É MAIS NECESSÁRIA AQUI
+// const GEMINI_API_KEY = import.meta.env.VITE_GOOGLE_API_KEY;
 
 // FIX: Tipagens rigorosas
 interface ReportProps {
@@ -131,28 +131,9 @@ export function MasterReportPage({ cliente, onBack }: ReportProps) {
       if (!interview) return alert("Ficha de entrevista não encontrada.");
       setGeneratingSummary(true);
       try {
-          const prompt = `
-          Atue como um advogado sênior previdenciarista.
-          Leia os dados fáticos do cliente rural e crie um "Resumo Executivo do Caso" em 1 parágrafo (máx 5 linhas).
-          O objetivo é que outro advogado leia e entenda a história de vida rural da pessoa instantaneamente.
-          
-          Cliente: ${cliente.nome}, Nascido em: ${cliente.data_nascimento}.
-          Propriedade: ${interview.dados_rurais?.nome_imovel} (${interview.dados_rurais?.area_total} Ha). Condição: ${interview.dados_rurais?.condicao_posse}.
-          Culturas: ${interview.dados_rurais?.culturas}. Destino: ${interview.dados_rurais?.destinacao}.
-          História contada: ${interview.historico_locais}
-          
-          Gere apenas o texto do resumo, sem introduções ou saudações. Tom profissional e direto.
-          `;
-
-          const genAI = new GoogleGenerativeAI(GEMINI_API_KEY);
-          const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-          const result = await model.generateContent(prompt);
-          const text = result.response.text();
-          
+          const text = await gerarResumoIA(cliente, interview);
           setAiSummary(text);
-          
           await supabase.from('interviews').update({ ai_summary: text }).eq('client_id', cliente.id);
-
       } catch (error: unknown) { // FIX: Tipagem Estrita
           const msg = error instanceof Error ? error.message : "Erro desconhecido";
           alert("Falha ao gerar resumo: " + msg);

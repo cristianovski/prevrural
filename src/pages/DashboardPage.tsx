@@ -1,14 +1,22 @@
+// src/pages/DashboardPage.tsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { 
-  Plus, Search, Filter, DollarSign, StickyNote, 
-  Trash2, UserCog, MessageCircle, Calculator, 
-  BrainCircuit, FolderOpen, Printer,
-  BookCheck, Cake, Users
+  Users, UserPlus, Search, Filter, TrendingUp, Clock, Calendar, 
+  CheckCircle, AlertCircle, XCircle, ChevronRight, Star, 
+  MessageCircle, FileText, Printer, FolderOpen, BrainCircuit,
+  Trash2, Edit, Eye, MoreHorizontal, PieChart, BarChart,
+  UserCog, Calculator, BookCheck, Briefcase, LogOut, LayoutDashboard,
+  Tractor, Scale, FileCheck, UploadCloud, Download, Save, X,
+  Plus, ArrowLeft, Paperclip, Link as LinkIcon, Activity, Heart,
+  HelpCircle, MapPin, Phone, PenTool, Shield, ShoppingBag, LayoutList,
+  BookOpen, Sparkles, Settings, Underline, AlignLeft, AlignCenter,
+  AlignJustify, Bold, Italic, List, ListOrdered, Undo, Redo, Indent,
+  Outdent, Type, Square, CheckSquare, DollarSign // ← ADICIONADO
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useToast } from "../hooks/use-toast";
-import { Client } from "../types";
+import { Client, BenefitStatus } from "../types";
 
 export function DashboardPage() {
   const navigate = useNavigate();
@@ -24,7 +32,6 @@ export function DashboardPage() {
   useEffect(() => {
     fetchClients();
     
-    // FIX: Segurança no Parse do LocalStorage para evitar Crash de Ecrã Branco
     try {
         const savedNotes = localStorage.getItem("dashboardNotes");
         if (savedNotes) setNotes(JSON.parse(savedNotes));
@@ -40,7 +47,7 @@ export function DashboardPage() {
         const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
         if (error) throw error;
         if (data) setClients(data as Client[]);
-    } catch (err: unknown) { // FIX: Tipagem Estrita
+    } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Erro desconhecido";
         toast({ title: "Erro", description: "Falha ao carregar clientes: " + msg, variant: "destructive" });
     } finally {
@@ -48,12 +55,12 @@ export function DashboardPage() {
     }
   };
 
-  const handleDeleteClient = async (id: number) => {
+  const handleDeleteClient = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
     if (confirm("ATENÇÃO: Apagar este cliente removerá tudo (ficha, documentos, histórico). Continuar?")) {
         try {
             const { error } = await supabase.from('clients').delete().eq('id', id);
             if (error) throw error;
-            
             toast({ title: "Sucesso", description: "Cliente removido.", variant: "success" });
             fetchClients();
         } catch (err: unknown) {
@@ -63,23 +70,29 @@ export function DashboardPage() {
     }
   };
 
-  const toggleStatus = async (client: Client) => {
-      const ciclo = ["A Iniciar", "Em Andamento", "Finalizado"];
-      const atual = (client.status_processo as string) || "A Iniciar";
-      const novo = ciclo[(ciclo.indexOf(atual) + 1) % ciclo.length];
-      
-      // Atualização Otimista (Muda na UI imediatamente)
-      setClients(prev => prev.map(c => c.id === client.id ? { ...c, status_processo: novo } : c));
-      
-      try {
-          const { error } = await supabase.from('clients').update({ status_processo: novo }).eq('id', client.id);
-          if (error) throw error;
-          toast({ title: "Status Atualizado", description: `Novo status: ${novo}`, variant: "default" });
-      } catch (err) {
-          // FIX: Se falhar a gravação na base, reverte a UI para a verdade absoluta
-          toast({ title: "Erro", description: "Não foi possível atualizar o status.", variant: "destructive" });
-          fetchClients(); 
-      }
+  const toggleStatus = async (client: Client, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const ciclo: BenefitStatus[] = ["A Iniciar", "Em Andamento", "Finalizado"];
+    const atual = client.status_processo ?? "A Iniciar";
+    const indexAtual = ciclo.indexOf(atual);
+    const novoIndex = (indexAtual + 1) % ciclo.length;
+    const novoStatus = ciclo[novoIndex];
+
+    setClients(prev => prev.map(c => 
+      c.id === client.id ? { ...c, status_processo: novoStatus } : c
+    ) as Client[]);
+
+    try {
+      const { error } = await supabase
+        .from('clients')
+        .update({ status_processo: novoStatus })
+        .eq('id', client.id);
+      if (error) throw error;
+      toast({ title: "Status Atualizado", description: `Novo status: ${novoStatus}`, variant: "default" });
+    } catch (err) {
+      toast({ title: "Erro", description: "Não foi possível atualizar o status.", variant: "destructive" });
+      fetchClients();
+    }
   };
 
   const addNote = () => {
@@ -96,7 +109,7 @@ export function DashboardPage() {
       localStorage.setItem("dashboardNotes", JSON.stringify(updated));
   };
 
-  const getStatusColor = (status?: string) => {
+  const getStatusColor = (status?: BenefitStatus): string => {
       switch(status) {
           case 'Finalizado': return 'bg-emerald-500';
           case 'Em Andamento': return 'bg-blue-500';
@@ -104,7 +117,22 @@ export function DashboardPage() {
       }
   };
 
-  // FIX: Adicionado Optional Chaining (?.) para defender a pesquisa contra registos corrompidos sem Nome ou CPF
+  const getStatusBg = (status?: BenefitStatus): string => {
+      switch(status) {
+          case 'Finalizado': return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+          case 'Em Andamento': return 'bg-blue-50 text-blue-700 border-blue-200';
+          default: return 'bg-amber-50 text-amber-700 border-amber-200';
+      }
+  };
+
+  const getStatusIcon = (status?: BenefitStatus) => {
+      switch(status) {
+          case 'Finalizado': return <CheckCircle size={14} className="text-emerald-600" />;
+          case 'Em Andamento': return <Clock size={14} className="text-blue-600" />;
+          default: return <AlertCircle size={14} className="text-amber-600" />;
+      }
+  };
+
   const clientesFiltrados = clients.filter(c => {
       const s = searchTerm.toLowerCase();
       const matchText = c.nome?.toLowerCase().includes(s) || c.cpf?.includes(s);
@@ -121,161 +149,414 @@ export function DashboardPage() {
       total: clients.length || 1
   };
 
-  // FIX: Garantia absoluta que partes da data existem antes do Parse
   const mesAtual = new Date().getMonth();
   const aniversariantes = clients.filter(c => {
       if (!c.data_nascimento) return false;
       const parts = c.data_nascimento.split('-');
       if (parts.length !== 3) return false; 
-      
       const mesNasc = parseInt(parts[1], 10) - 1;
       return mesNasc === mesAtual;
   }).sort((a, b) => parseInt(a.data_nascimento!.split('-')[2], 10) - parseInt(b.data_nascimento!.split('-')[2], 10));
 
+  // Dados para gráfico de pizza (simulado)
+  const pieData = [
+    { name: 'A Iniciar', value: stats.iniciar, color: '#f59e0b' },
+    { name: 'Em Andamento', value: stats.andamento, color: '#3b82f6' },
+    { name: 'Finalizado', value: stats.finalizado, color: '#10b981' },
+  ];
+
   return (
-    <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth">
-        <div className="max-w-7xl mx-auto pb-20 flex flex-col lg:flex-row gap-8">
-            {/* COLUNA PRINCIPAL */}
-            <div className="flex-1 space-y-8 min-w-0">
-                
-                {/* HERO STATS */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    <div className="bg-gradient-to-br from-emerald-600 to-teal-800 p-6 rounded-[2rem] shadow-xl shadow-emerald-200 text-white flex flex-col justify-between h-40 relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -mr-10 -mt-10 group-hover:bg-white/20 transition-all"></div>
-                        <div className="relative z-10 flex justify-between items-start">
-                            <div><p className="text-xs font-bold text-emerald-100 uppercase tracking-wider mb-2">Potencial da Carteira</p><h3 className="text-3xl font-black tracking-tight">{totalCarteira.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}</h3></div>
-                            <div className="bg-white/20 p-2 rounded-xl backdrop-blur-md"><DollarSign size={24} className="text-white"/></div>
-                        </div>
-                        <div className="relative z-10 text-xs font-medium text-emerald-100 mt-auto flex items-center gap-1"><div className="w-1.5 h-1.5 bg-emerald-300 rounded-full animate-pulse"></div> Atualizado hoje</div>
-                    </div>
-                    
-                    <div className="md:col-span-2 bg-white p-6 rounded-[2rem] shadow-sm border border-slate-200 flex flex-col justify-center h-40">
-                        <h3 className="font-bold text-slate-700 mb-6 flex items-center gap-2 text-sm uppercase tracking-wide"><Filter size={16} className="text-slate-400"/> Funil de Processos</h3>
-                        <div className="space-y-5">
-                            <div className="flex items-center gap-4 text-xs font-medium">
-                                <span className="w-24 text-slate-500 font-bold">A Iniciar</span>
-                                <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-amber-400 rounded-full transition-all duration-1000" style={{width: `${(stats.iniciar/stats.total)*100}%`}}></div></div>
-                                <span className="w-8 text-right font-bold text-slate-800">{stats.iniciar}</span>
-                            </div>
-                            <div className="flex items-center gap-4 text-xs font-medium">
-                                <span className="w-24 text-slate-500 font-bold">Em Andamento</span>
-                                <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{width: `${(stats.andamento/stats.total)*100}%`}}></div></div>
-                                <span className="w-8 text-right font-bold text-slate-800">{stats.andamento}</span>
-                            </div>
-                            <div className="flex items-center gap-4 text-xs font-medium">
-                                <span className="w-24 text-slate-500 font-bold">Finalizados</span>
-                                <div className="flex-1 h-2.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 rounded-full transition-all duration-1000" style={{width: `${(stats.finalizado/stats.total)*100}%`}}></div></div>
-                                <span className="w-8 text-right font-bold text-slate-800">{stats.finalizado}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* BARRA DE PESQUISA E FILTROS */}
-                <div className="flex flex-col gap-4">
-                    <div className="flex flex-col md:flex-row gap-4 items-center">
-                        <div className="relative flex-1 w-full group">
-                            <Search className="absolute left-5 top-4 text-slate-400 group-focus-within:text-emerald-600 transition-colors" size={20}/>
-                            <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder="Buscar cliente por nome ou CPF..." className="w-full pl-14 pr-6 py-4 rounded-2xl bg-white border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all font-medium text-slate-700 shadow-sm group-focus-within:shadow-md"/>
-                        </div>
-                        <button onClick={() => navigate('/cliente/novo')} className="w-full md:w-auto bg-slate-900 hover:bg-black text-white px-8 py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-xl shadow-slate-900/20 hover:scale-[1.02] transition-all active:scale-95 whitespace-nowrap"><Plus size={20}/> Novo Cliente</button>
-                    </div>
-                    
-                    <div className="flex gap-2 overflow-x-auto pb-2">
-                        {["Todos", "A Iniciar", "Em Andamento", "Finalizado"].map(st => (
-                            <button key={st} onClick={() => setStatusFilter(st)} className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-colors border ${statusFilter === st ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'}`}>
-                                {st}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* LISTA DE CLIENTES */}
-                <div className="space-y-4">
-                    {loading ? <div className="text-center py-20 text-slate-400">Carregando carteira...</div> : clientesFiltrados.length === 0 ? <div className="text-center py-20 bg-white rounded-[2rem] border-2 border-dashed border-slate-200"><Users size={48} className="mx-auto text-slate-300 mb-4"/><p className="text-slate-500 font-medium">Nenhum cliente encontrado.</p></div> : (
-                        clientesFiltrados.map(client => {
-                            return (
-                                <div key={client.id} className="bg-white rounded-[1.2rem] shadow-sm border border-slate-100 hover:border-emerald-200 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 group overflow-hidden relative">
-                                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 cursor-pointer hover:w-2.5 transition-all ${getStatusColor(client.status_processo as string)}`} onClick={() => toggleStatus(client)} title="Alterar Status"></div>
-                                    <div className="pl-6 p-6">
-                                        <div className="flex justify-between items-start mb-6">
-                                            <div><h3 className="font-bold text-xl text-slate-800 tracking-tight">{client.nome}</h3></div>
-                                        </div>
-                                        <div className="flex items-center gap-4 border-t border-slate-100 pt-4 flex-wrap">
-                                            <div className="flex gap-2">
-                                                <button onClick={() => navigate(`/cliente/${client.id}`)} className="p-2.5 bg-slate-50 text-slate-600 rounded-lg hover:bg-blue-600 hover:text-white transition-colors border border-slate-200" title="Ficha"><UserCog size={18}/></button>
-                                                <button onClick={() => window.open(`https://wa.me/55${client.telefone?.replace(/\D/g, '') || ''}`, '_blank')} className="p-2.5 bg-slate-50 text-slate-600 rounded-lg hover:bg-emerald-500 hover:text-white transition-colors border border-slate-200" title="WhatsApp"><MessageCircle size={18}/></button>
-                                            </div>
-                                            <div className="w-px h-8 bg-slate-200 hidden sm:block"></div>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => navigate(`/analise/${client.id}`)} className="p-2.5 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-500 hover:text-white transition-colors border border-orange-100" title="Calculadora"><Calculator size={18}/></button>
-                                                <button onClick={() => navigate(`/parecer/${client.id}`)} className="p-2.5 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-600 hover:text-white transition-colors border border-purple-100" title="Parecer IA"><BrainCircuit size={18}/></button>
-                                            </div>
-                                            <div className="w-px h-8 bg-slate-200 hidden sm:block"></div>
-                                            <div className="flex gap-2">
-                                                <button onClick={() => navigate(`/documentos/${client.id}`)} className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-colors border border-emerald-100" title="GED"><FolderOpen size={18}/></button>
-                                                <button onClick={() => navigate(`/procuracao/${client.id}`)} className="p-2.5 bg-teal-50 text-teal-600 rounded-lg hover:bg-teal-600 hover:text-white transition-colors border border-teal-100" title="Procuração"><Printer size={18}/></button>
-                                                <button onClick={() => navigate(`/dossie/${client.id}`)} className="p-2.5 bg-cyan-50 text-cyan-600 rounded-lg hover:bg-cyan-600 hover:text-white transition-colors border border-cyan-100" title="Dossiê Completo"><BookCheck size={18}/></button>
-                                            </div>
-                                            <div className="flex-1"></div>
-                                            <button onClick={() => handleDeleteClient(client.id)} className="p-2.5 text-slate-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={18}/></button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )
-                        })
-                    )}
-                </div>
-            </div>
-
-            {/* BARRA LATERAL DIREITA (WIDGETS) */}
-            <div className="w-full lg:w-80 space-y-6">
-                {/* WIDGET ANIVERSARIANTES */}
-                <div className="bg-white rounded-[2rem] shadow-lg shadow-pink-100/50 border border-pink-100 overflow-hidden">
-                    <div className="bg-gradient-to-r from-pink-500 to-rose-600 p-5 text-white relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full -mr-8 -mt-8 blur-xl"></div>
-                        <h3 className="font-bold flex items-center gap-2 relative z-10"><Cake size={18} className="text-pink-200"/> Aniversariantes</h3>
-                        <p className="text-xs text-pink-100 opacity-90 relative z-10 mt-1">Mês de {new Date().toLocaleString('pt-BR', { month: 'long' })}</p>
-                    </div>
-                    <div className="p-5 space-y-4 max-h-80 overflow-y-auto">
-                        {aniversariantes.length === 0 ? <div className="text-center text-slate-400 text-xs py-4">Nenhum este mês.</div> : 
-                            aniversariantes.map(c => (
-                                <div key={c.id} className="flex items-center gap-4 p-3 bg-pink-50/50 rounded-2xl border border-pink-100/50 group hover:bg-pink-50 transition-colors">
-                                    <div className="w-12 h-12 rounded-xl bg-white text-pink-600 flex flex-col items-center justify-center font-bold text-xs shadow-sm leading-tight border border-pink-100">
-                                        <span className="text-[9px] uppercase tracking-wider text-pink-400">Dia</span>
-                                        <span className="text-lg">{c.data_nascimento?.split('-')[2]}</span>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-slate-800 text-sm truncate">{c.nome}</p>
-                                        <button onClick={() => window.open(`https://wa.me/55${c.telefone?.replace(/\D/g, '') || ''}`, '_blank')} className="text-[11px] text-pink-600 font-bold hover:underline flex items-center gap-1 mt-0.5">Parabéns WhatsApp</button>
-                                    </div>
-                                </div>
-                            ))
-                        }
-                    </div>
-                </div>
-
-                {/* WIDGET LEMBRETES */}
-                <div className="bg-amber-50/50 rounded-[2rem] shadow-sm border border-amber-100 p-6 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200/20 rounded-full blur-3xl -mr-10 -mt-10"></div>
-                    <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2 text-sm relative z-10"><StickyNote size={18} className="text-amber-500"/> Lembretes</h3>
-                    <div className="flex gap-2 mb-5 relative z-10">
-                        <input value={newNote} onChange={e => setNewNote(e.target.value)} onKeyDown={e => e.key === 'Enter' && addNote()} placeholder="Nova nota..." className="flex-1 bg-white border border-amber-200 rounded-xl px-4 py-2 text-xs outline-none focus:border-amber-400 transition-all"/>
-                        <button onClick={addNote} className="bg-amber-400 hover:bg-amber-500 text-amber-900 rounded-xl px-3 py-1 text-lg font-bold transition-colors shadow-sm">+</button>
-                    </div>
-                    <div className="space-y-3 relative z-10">
-                        {notes.length === 0 && <p className="text-xs text-slate-400 italic text-center py-2">Sem lembretes.</p>}
-                        {notes.map((note, i) => (
-                            <div key={i} className="flex gap-3 items-start text-xs text-slate-700 bg-white p-3 rounded-xl border border-amber-100 shadow-sm group hover:scale-[1.02] transition-transform">
-                                <div className="w-2 h-2 rounded-full bg-amber-400 mt-1 shrink-0"></div>
-                                <span className="flex-1 break-words font-medium">{note}</span>
-                                <button onClick={() => removeNote(i)} className="text-slate-300 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14}/></button>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
+    <div className="flex-1 overflow-y-auto bg-gradient-to-br from-slate-50 to-slate-100 p-4 md:p-8">
+      <div className="max-w-7xl mx-auto">
+        
+        {/* Header com boas-vindas */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-slate-800 tracking-tight">Dashboard</h1>
+            <p className="text-slate-500 mt-1">Bem-vindo de volta! Aqui está o resumo da sua carteira.</p>
+          </div>
+          <button 
+            onClick={() => navigate('/cliente/novo')}
+            className="mt-4 md:mt-0 bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white px-6 py-3 rounded-xl font-semibold flex items-center gap-2 shadow-lg shadow-emerald-200/50 transition-all hover:shadow-xl hover:-translate-y-0.5"
+          >
+            <UserPlus size={20} />
+            Novo Cliente
+          </button>
         </div>
+
+        {/* Cards de estatísticas */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-emerald-100 rounded-xl text-emerald-600">
+                <Users size={24} />
+              </div>
+              <span className="text-xs font-medium text-slate-400 bg-slate-100 px-2 py-1 rounded-full">Total</span>
+            </div>
+            <h3 className="text-2xl font-bold text-slate-800">{stats.total}</h3>
+            <p className="text-sm text-slate-500 mt-1">Clientes cadastrados</p>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-amber-100 rounded-xl text-amber-600">
+                <AlertCircle size={24} />
+              </div>
+              <span className="text-xs font-medium text-amber-600 bg-amber-50 px-2 py-1 rounded-full">{stats.iniciar}</span>
+            </div>
+            <h3 className="text-2xl font-bold text-slate-800">A Iniciar</h3>
+            <p className="text-sm text-slate-500 mt-1">Aguardando análise</p>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-blue-100 rounded-xl text-blue-600">
+                <Clock size={24} />
+              </div>
+              <span className="text-xs font-medium text-blue-600 bg-blue-50 px-2 py-1 rounded-full">{stats.andamento}</span>
+            </div>
+            <h3 className="text-2xl font-bold text-slate-800">Em Andamento</h3>
+            <p className="text-sm text-slate-500 mt-1">Processos ativos</p>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 hover:shadow-md transition-all">
+            <div className="flex items-center justify-between mb-4">
+              <div className="p-3 bg-emerald-100 rounded-xl text-emerald-600">
+                <CheckCircle size={24} />
+              </div>
+              <span className="text-xs font-medium text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full">{stats.finalizado}</span>
+            </div>
+            <h3 className="text-2xl font-bold text-slate-800">Finalizados</h3>
+            <p className="text-sm text-slate-500 mt-1">Concluídos</p>
+          </div>
+        </div>
+
+        {/* Gráfico de pizza simulado e filtros */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <div className="lg:col-span-1 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+              <PieChart size={18} className="text-slate-400" />
+              Distribuição de Processos
+            </h3>
+            <div className="flex flex-col items-center">
+              <div className="relative w-40 h-40 mb-4">
+                {/* Simulação de gráfico de pizza com CSS */}
+                <div className="absolute inset-0 rounded-full bg-gradient-to-r from-amber-400 via-blue-500 to-emerald-500"
+                     style={{ 
+                       background: `conic-gradient(
+                         #f59e0b 0deg ${(stats.iniciar / stats.total) * 360}deg,
+                         #3b82f6 ${(stats.iniciar / stats.total) * 360}deg ${((stats.iniciar + stats.andamento) / stats.total) * 360}deg,
+                         #10b981 ${((stats.iniciar + stats.andamento) / stats.total) * 360}deg 360deg
+                       )`
+                     }}>
+                </div>
+                <div className="absolute inset-2 bg-white rounded-full flex items-center justify-center">
+                  <span className="text-2xl font-bold text-slate-700">{stats.total}</span>
+                </div>
+              </div>
+              <div className="w-full space-y-2">
+                {pieData.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                      <span className="text-slate-600">{item.name}</span>
+                    </div>
+                    <span className="font-medium text-slate-800">{item.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+              <Filter size={18} className="text-slate-400" />
+              Filtros e Pesquisa
+            </h3>
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-4 top-3.5 text-slate-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="Buscar por nome ou CPF..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 rounded-xl border border-slate-200 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
+                />
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-2 md:pb-0">
+                {["Todos", "A Iniciar", "Em Andamento", "Finalizado"].map(st => (
+                  <button
+                    key={st}
+                    onClick={() => setStatusFilter(st)}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-all ${
+                      statusFilter === st
+                        ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200'
+                        : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    {st}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Lista de Clientes */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-slate-800">Últimos Clientes</h2>
+            <button
+              onClick={() => navigate('/clientes')}
+              className="text-emerald-600 hover:text-emerald-700 font-medium text-sm flex items-center gap-1"
+            >
+              Ver todos <ChevronRight size={16} />
+            </button>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100 animate-pulse">
+                  <div className="h-10 w-10 bg-slate-200 rounded-xl mb-4"></div>
+                  <div className="h-5 w-3/4 bg-slate-200 rounded mb-2"></div>
+                  <div className="h-4 w-1/2 bg-slate-200 rounded mb-4"></div>
+                  <div className="space-y-2">
+                    <div className="h-3 w-full bg-slate-200 rounded"></div>
+                    <div className="h-3 w-2/3 bg-slate-200 rounded"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : clientesFiltrados.length === 0 ? (
+            <div className="bg-white rounded-2xl p-12 text-center border-2 border-dashed border-slate-200">
+              <Users size={48} className="mx-auto text-slate-300 mb-4" />
+              <h3 className="text-lg font-medium text-slate-700 mb-2">Nenhum cliente encontrado</h3>
+              <p className="text-slate-500 mb-4">Que tal cadastrar seu primeiro cliente agora?</p>
+              <button
+                onClick={() => navigate('/cliente/novo')}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2 rounded-xl font-medium inline-flex items-center gap-2"
+              >
+                <UserPlus size={18} />
+                Novo Cliente
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {clientesFiltrados.slice(0, 6).map((client) => (
+                <div
+                  key={client.id}
+                  onClick={() => navigate(`/cliente/${client.id}`)}
+                  className="bg-white rounded-2xl shadow-sm border border-slate-100 hover:shadow-md hover:border-emerald-200 transition-all cursor-pointer group overflow-hidden relative"
+                >
+                  {/* Barra lateral de status (clicável para alterar status) */}
+                  <div
+                    className={`absolute left-0 top-0 bottom-0 w-1.5 cursor-pointer hover:w-2.5 transition-all ${getStatusColor(client.status_processo)}`}
+                    onClick={(e) => toggleStatus(client, e)}
+                    title="Clique para alterar status"
+                  ></div>
+
+                  <div className="pl-6 p-6">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-teal-500 rounded-xl flex items-center justify-center text-white font-bold text-lg">
+                          {client.nome?.charAt(0).toUpperCase()}
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-slate-800 group-hover:text-emerald-700 transition-colors">
+                            {client.nome}
+                          </h3>
+                          <p className="text-xs text-slate-500 font-mono mt-0.5">{client.cpf}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Informações de contato */}
+                    <div className="space-y-2 mb-4 text-sm text-slate-600">
+                      <div className="flex items-center gap-2">
+                        <MapPin size={14} className="text-slate-400 shrink-0" />
+                        <span className="truncate text-xs">{client.cidade || client.endereco || 'Local não informado'}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Phone size={14} className="text-slate-400 shrink-0" />
+                        <span className="truncate text-xs">{client.telefone || 'Sem telefone'}</span>
+                      </div>
+                    </div>
+
+                    {/* Botões de ação (restaurados) */}
+                    <div className="flex items-center gap-2 pt-4 border-t border-slate-100 flex-wrap">
+                      {/* Grupo 1: Ficha e WhatsApp */}
+                      <div className="flex gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/cliente/${client.id}`); }}
+                          className="p-2 rounded-lg bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                          title="Ficha do Cliente"
+                        >
+                          <UserCog size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); window.open(`https://wa.me/55${client.telefone?.replace(/\D/g, '') || ''}`, '_blank'); }}
+                          className="p-2 rounded-lg bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+                          title="WhatsApp"
+                        >
+                          <MessageCircle size={16} />
+                        </button>
+                      </div>
+
+                      <div className="w-px h-6 bg-slate-200"></div>
+
+                      {/* Grupo 2: Calculadora e Parecer IA */}
+                      <div className="flex gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/analise/${client.id}`); }}
+                          className="p-2 rounded-lg bg-slate-50 text-slate-600 hover:bg-amber-50 hover:text-amber-600 transition-colors"
+                          title="Calculadora Estratégica"
+                        >
+                          <Calculator size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/parecer/${client.id}`); }}
+                          className="p-2 rounded-lg bg-slate-50 text-slate-600 hover:bg-purple-50 hover:text-purple-600 transition-colors"
+                          title="Parecer IA"
+                        >
+                          <BrainCircuit size={16} />
+                        </button>
+                      </div>
+
+                      <div className="w-px h-6 bg-slate-200"></div>
+
+                      {/* Grupo 3: GED, Procuração, Dossiê e Financeiro */}
+                      <div className="flex gap-1">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/documentos/${client.id}`); }}
+                          className="p-2 rounded-lg bg-slate-50 text-slate-600 hover:bg-blue-50 hover:text-blue-600 transition-colors"
+                          title="Documentos (GED)"
+                        >
+                          <FolderOpen size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/procuracao/${client.id}`); }}
+                          className="p-2 rounded-lg bg-slate-50 text-slate-600 hover:bg-teal-50 hover:text-teal-600 transition-colors"
+                          title="Procuração"
+                        >
+                          <FileText size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/dossie/${client.id}`); }}
+                          className="p-2 rounded-lg bg-slate-50 text-slate-600 hover:bg-cyan-50 hover:text-cyan-600 transition-colors"
+                          title="Dossiê Completo"
+                        >
+                          <BookCheck size={16} />
+                        </button>
+                        {/* NOVO BOTÃO FINANCEIRO */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/cliente/${client.id}/financeiro`); }}
+                          className="p-2 rounded-lg bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+                          title="Financeiro do Cliente"
+                        >
+                          <DollarSign size={16} />
+                        </button>
+                      </div>
+
+                      <div className="flex-1"></div>
+
+                      {/* Botão deletar */}
+                      <button
+                        onClick={(e) => handleDeleteClient(client.id, e)}
+                        className="p-2 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+                        title="Excluir cliente"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Barra lateral de aniversariantes e lembretes */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Aniversariantes */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+                <Calendar size={18} className="text-pink-500" />
+                Aniversariantes do Mês
+              </h3>
+              <span className="text-xs bg-pink-100 text-pink-600 px-2 py-1 rounded-full font-medium">
+                {aniversariantes.length}
+              </span>
+            </div>
+            {aniversariantes.length === 0 ? (
+              <p className="text-sm text-slate-500 text-center py-4">Nenhum aniversariante este mês.</p>
+            ) : (
+              <div className="space-y-3">
+                {aniversariantes.map((c) => (
+                  <div key={c.id} className="flex items-center gap-3 p-3 bg-pink-50/50 rounded-xl border border-pink-100">
+                    <div className="w-10 h-10 bg-pink-100 rounded-xl flex flex-col items-center justify-center text-pink-600 font-bold">
+                      <span className="text-xs leading-none">Dia</span>
+                      <span className="text-lg leading-none">{c.data_nascimento?.split('-')[2]}</span>
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-medium text-slate-800 text-sm">{c.nome}</p>
+                      <button
+                        onClick={() => window.open(`https://wa.me/55${c.telefone?.replace(/\D/g, '') || ''}`, '_blank')}
+                        className="text-xs text-pink-600 font-medium hover:underline flex items-center gap-1 mt-0.5"
+                      >
+                        <MessageCircle size={12} /> Enviar parabéns
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Lembretes */}
+          <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-100">
+            <h3 className="font-semibold text-slate-700 flex items-center gap-2 mb-4">
+              <Star size={18} className="text-amber-500" />
+              Lembretes Rápidos
+            </h3>
+            <div className="flex gap-2 mb-4">
+              <input
+                type="text"
+                value={newNote}
+                onChange={(e) => setNewNote(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && addNote()}
+                placeholder="Adicionar lembrete..."
+                className="flex-1 border border-slate-200 rounded-xl px-4 py-2 text-sm focus:border-amber-500 focus:ring-4 focus:ring-amber-500/10 outline-none"
+              />
+              <button
+                onClick={addNote}
+                className="bg-amber-500 hover:bg-amber-600 text-white px-4 py-2 rounded-xl font-medium transition-colors"
+              >
+                Adicionar
+              </button>
+            </div>
+            <div className="space-y-2 max-h-60 overflow-y-auto">
+              {notes.length === 0 ? (
+                <p className="text-sm text-slate-500 text-center py-4">Nenhum lembrete salvo.</p>
+              ) : (
+                notes.map((note, i) => (
+                  <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 group">
+                    <span className="text-sm text-slate-700">{note}</span>
+                    <button
+                      onClick={() => removeNote(i)}
+                      className="text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
+// src/components/Layout.tsx
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
 import { 
-  LayoutDashboard, Users, BookCopy, Briefcase, LogOut 
+  LayoutDashboard, Users, BookCopy, Briefcase, LogOut, DollarSign 
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -10,7 +11,7 @@ export function Layout() {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate(0); // Força recarregamento para cair no login
+    navigate(0);
   };
 
   const isActive = (path: string) => location.pathname === path;
@@ -45,6 +46,11 @@ export function Layout() {
             
             <Link to="/advogados" className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive('/advogados') ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'}`}>
                 <Briefcase size={18}/> Equipe & Advogados
+            </Link>
+
+            {/* NOVO ITEM: FLUXO DE CAIXA */}
+            <Link to="/fluxo-caixa" className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive('/fluxo-caixa') ? 'bg-emerald-50 text-emerald-700' : 'text-slate-500 hover:bg-emerald-50 hover:text-emerald-700'}`}>
+                <DollarSign size={18}/> Fluxo de Caixa
             </Link>
         </nav>
         
