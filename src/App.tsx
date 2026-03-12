@@ -1,15 +1,10 @@
-// src/App.tsx
 import { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useParams } from 'react-router-dom';
 import { supabase } from './lib/supabase';
 import { Toaster } from './components/ui/toaster';
-
-// Layout e Autenticação
 import { Layout } from './components/Layout';
 import { LoginPage } from './components/LoginPage';
 import { ProtectedRoute } from './components/ProtectedRoute';
-
-// Páginas
 import { DashboardPage } from './pages/DashboardPage';
 import { ClientListPage } from './pages/clients/ClientListPage';
 import { ClientFormPage } from './pages/clients/ClientFormPage';
@@ -22,48 +17,39 @@ import { ProcuracaoPrint } from './pages/documents/ProcuracaoPrint';
 import { DocumentsPage } from './pages/documents/DocumentsPage';
 import { LibraryPage } from './pages/admin/LibraryPage';
 import { LawyersPage } from './pages/admin/LawyersPage';
-
-// Novas páginas financeiras
 import { ClientFinancePage } from './pages/finance/ClientFinancePage';
 import { CashFlowPage } from './pages/finance/CashFlowPage';
+import { Client, ClientComponent, WithClientProps } from './types';
 
-// --- WRAPPER DE CARREGAMENTO DE CLIENTE ---
-function ClientLoader({ Component }: { Component: any }) {
+// Wrapper de carregamento de cliente com tipagem
+function ClientLoader({ Component }: { Component: ClientComponent }) {
   const { id } = useParams();
-  const [client, setClient] = useState<any>(null);
+  const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!id) { 
-        setLoading(false); 
-        return; 
+    if (!id) {
+      setLoading(false);
+      return;
     }
-    
     const fetchClient = async () => {
-        const { data, error } = await supabase
-            .from('clients')
-            .select('*')
-            .eq('id', id)
-            .single();
-            
-        if (data) setClient(data);
-        if (error) console.error("Erro ao carregar cliente:", error);
-        setLoading(false);
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (data) setClient(data as Client);
+      if (error) console.error("Erro ao carregar cliente:", error);
+      setLoading(false);
     };
-
     fetchClient();
   }, [id]);
 
   if (loading) return <div className="h-full flex items-center justify-center text-slate-400">Carregando contexto do cliente...</div>;
-  
   if (!client && id) return <div className="p-8 text-center">Cliente não encontrado.</div>;
+  if (!client) return null; // Segurança
 
-  return <Component 
-    cliente={client} 
-    clienteId={client?.id}
-    clientId={client?.id}
-    onBack={() => window.history.back()} 
-  />;
+  return <Component cliente={client} onBack={() => window.history.back()} />;
 }
 
 function App() {
@@ -71,43 +57,33 @@ function App() {
     <>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
-
         <Route element={<ProtectedRoute />}>
           <Route path="/" element={<Layout />}>
             <Route index element={<DashboardPage />} />
             <Route path="clientes" element={<ClientListPage />} />
-
-            {/* Rotas de Cliente */}
-            <Route path="cliente/novo" element={<ClientFormPage onBack={() => window.history.back()} clienteId={null} />} />
+            
+            {/* Rota para novo cliente (não usa loader) */}
+            <Route path="cliente/novo" element={<ClientFormPage onBack={() => window.history.back()} />} />
+            
+            {/* Rotas que carregam cliente existente */}
             <Route path="cliente/:id" element={<ClientLoader Component={ClientFormPage} />} />
-
-            {/* Ferramentas Jurídicas */}
             <Route path="analise/:id" element={<ClientLoader Component={AnalysisPage} />} />
             <Route path="parecer/:id" element={<ClientLoader Component={LegalOpinionPage} />} />
             <Route path="dossie/:id" element={<ClientLoader Component={MasterReportPage} />} />
-
-            {/* Linha do Tempo e Documentos */}
             <Route path="linha-tempo/:id" element={<ClientLoader Component={TimelinePage} />} />
             <Route path="documentos/:id" element={<ClientLoader Component={ClientDocumentsManager} />} />
-
-            {/* Geração de Docs */}
             <Route path="editor/:id" element={<ClientLoader Component={DocumentsPage} />} />
             <Route path="procuracao/:id" element={<ClientLoader Component={ProcuracaoPrint} />} />
+            <Route path="cliente/:id/financeiro" element={<ClientLoader Component={ClientFinancePage} />} />
 
-            {/* Admin */}
+            {/* Admin e outras rotas sem cliente */}
             <Route path="biblioteca" element={<LibraryPage onBack={() => window.history.back()} />} />
             <Route path="advogados" element={<LawyersPage onBack={() => window.history.back()} />} />
-
-            {/* NOVAS ROTAS FINANCEIRAS */}
-            <Route path="cliente/:id/financeiro" element={<ClientLoader Component={ClientFinancePage} />} />
             <Route path="fluxo-caixa" element={<CashFlowPage />} />
           </Route>
         </Route>
-        
-        {/* Redirecionamento padrão */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
-      
       <Toaster />
     </>
   );

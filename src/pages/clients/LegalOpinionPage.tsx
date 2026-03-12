@@ -1,4 +1,3 @@
-// src/pages/clients/LegalOpinionPage.tsx
 import { useState, useEffect } from "react";
 import { 
   ArrowLeft, BrainCircuit, CheckCircle, AlertTriangle, 
@@ -8,9 +7,10 @@ import {
 import { supabase } from "../../lib/supabase";
 import { analisarViabilidade, AnalysisResult, ClientData } from "../../utils/benefitRules"; 
 import { useToast } from "../../hooks/use-toast";
+import { Client } from "../../types";
 
 interface LegalOpinionPageProps {
-  clientId: number;
+  cliente: Client;
   onBack: () => void;
 }
 
@@ -23,9 +23,9 @@ const BENEFIT_TYPES = [
   "Pensão por morte"
 ];
 
-export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
+export function LegalOpinionPage({ cliente, onBack }: LegalOpinionPageProps) {
   const { toast } = useToast();
-  const [client, setClient] = useState<any>(null);
+  const [client, setClient] = useState<Client | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [parecerIA, setParecerIA] = useState("");
@@ -61,23 +61,23 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
+      setClient(cliente); // usa o cliente passado
       await Promise.all([
-        fetchClientData(),
         fetchTheses(),
         fetchDocuments()
       ]);
       setLoading(false);
     };
     loadData();
-  }, [clientId]);
+  }, [cliente]);
 
   // Recalcular viabilidade quando os parâmetros mudarem
   useEffect(() => {
     if (client) {
       const dadosAnalise: ClientData = {
         sexo: client.sexo || 'Masculino',
-        data_nascimento: client.data_nascimento,
-        profissao: client.profissao,
+        data_nascimento: client.data_nascimento || '',
+        profissao: client.profissao || '', // <-- CORREÇÃO: adicionado fallback para string vazia
         possui_cnpj: client.possui_cnpj,
         possui_outra_renda: client.possui_outra_renda,
         tempo_rural_anos: tempoRural,
@@ -88,17 +88,6 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
       setResultado(analise);
     }
   }, [client, selectedBenefit, tempoRural, tempoUrbano, extraParams]);
-
-  const fetchClientData = async () => {
-    const { data } = await supabase.from('clients').select('*').eq('id', clientId).single();
-    if (data) {
-        setClient(data);
-        if (data.parecer_ia) {
-            setParecerIA(data.parecer_ia);
-            setLastAnalysisDate(data.data_ultima_analise);
-        }
-    }
-  };
 
   const fetchTheses = async () => {
       const { data } = await supabase
@@ -117,7 +106,7 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
     const { data } = await supabase
       .from('client_documents')
       .select('*')
-      .eq('client_id', clientId)
+      .eq('client_id', cliente.id)
       .eq('category', 'Provas')
       .order('reference_date', { ascending: false });
     
@@ -171,7 +160,7 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
           "Authorization": `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
-          clientId,
+          clientId: cliente.id,
           thesisId: selectedThesisId,
           documentIds: selectedDocs
         })
@@ -180,7 +169,6 @@ export function LegalOpinionPage({ clientId, onBack }: LegalOpinionPageProps) {
       console.log("3️⃣ Resposta recebida, status:", response.status);
 
       if (!response.ok) {
-        // Tenta obter o texto do erro (pode ser JSON ou HTML)
         const errorText = await response.text();
         console.log("4️⃣ Resposta de erro (texto):", errorText);
         throw new Error(`Erro ${response.status}: ${errorText.substring(0, 200)}`);

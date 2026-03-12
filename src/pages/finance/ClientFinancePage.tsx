@@ -1,117 +1,28 @@
-// src/pages/finance/ClientFinancePage.tsx
-import { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { ArrowLeft, Plus, DollarSign, Calendar, CheckCircle, AlertCircle, Eye, Upload } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
-import { useToast } from '../../hooks/use-toast';
-import { Client } from '../../types';
-import {
-  fetchResponsibilities,
-  fetchInstallments,
-  createResponsibility,
-  payInstallment
-} from '../../services/financeService';
-import { FinancialResponsibility, FinancialInstallment } from '../../types/finance';
-import { getLocalDateISO } from '../../lib/utils';
+import { useNavigate } from 'react-router-dom';
+import { useClientFinance } from '../../hooks/useClientFinance';
 
 export function ClientFinancePage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [client, setClient] = useState<Client | null>(null);
-  const [responsibilities, setResponsibilities] = useState<FinancialResponsibility[]>([]);
-  const [installments, setInstallments] = useState<FinancialInstallment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [formData, setFormData] = useState({
-    descricao: '',
-    valor_total: '',
-    tipo: 'parcelado_fixo' as 'parcelado_fixo' | 'exito' | 'ambos',
-    numero_parcelas: '',
-    data_inicio: getLocalDateISO(),
-    observacoes: ''
-  });
+  const clientId = Number(id);
 
-  useEffect(() => {
-    if (id) loadData();
-  }, [id]);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const { data: clientData } = await supabase.from('clients').select('*').eq('id', id).single();
-      setClient(clientData);
-
-      const respList = await fetchResponsibilities(Number(id));
-      setResponsibilities(respList);
-
-      const instList = await fetchInstallments();
-      const filteredInst = instList.filter(i => respList.some(r => r.id === i.responsibility_id));
-      setInstallments(filteredInst);
-    } catch (error) {
-      toast({ title: 'Erro', description: 'Falha ao carregar dados financeiros', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateResponsibility = async () => {
-    if (!formData.descricao || !formData.valor_total || !formData.data_inicio) {
-      toast({ title: 'Atenção', description: 'Preencha os campos obrigatórios', variant: 'destructive' });
-      return;
-    }
-
-    try {
-      const novaResp = await createResponsibility({
-        client_id: Number(id),
-        descricao: formData.descricao,
-        valor_total: Number(formData.valor_total),
-        tipo: formData.tipo,
-        numero_parcelas: formData.numero_parcelas ? Number(formData.numero_parcelas) : null,
-        data_inicio: formData.data_inicio,
-        observacoes: formData.observacoes
-      });
-
-      if (formData.tipo === 'parcelado_fixo' && formData.numero_parcelas) {
-        const numParcelas = Number(formData.numero_parcelas);
-        const valorParcela = novaResp.valor_total / numParcelas;
-        const dataInicio = new Date(novaResp.data_inicio);
-
-        for (let i = 1; i <= numParcelas; i++) {
-          const vencimento = new Date(dataInicio);
-          vencimento.setMonth(vencimento.getMonth() + i - 1);
-          await supabase.from('financial_installments').insert({
-            responsibility_id: novaResp.id,
-            numero_parcela: i,
-            valor_previsto: valorParcela,
-            data_vencimento: vencimento.toISOString().split('T')[0],
-            status: 'pendente'
-          });
-        }
-      }
-
-      toast({ title: 'Sucesso', description: 'Obrigação cadastrada', variant: 'success' });
-      setShowForm(false);
-      setFormData({ descricao: '', valor_total: '', tipo: 'parcelado_fixo', numero_parcelas: '', data_inicio: getLocalDateISO(), observacoes: '' });
-      loadData();
-    } catch (error) {
-      toast({ title: 'Erro', description: 'Não foi possível salvar', variant: 'destructive' });
-    }
-  };
-
-  const handlePayInstallment = async (installment: FinancialInstallment) => {
-    const dataPagamento = getLocalDateISO();
-    try {
-      await payInstallment(installment.id, dataPagamento, installment.valor_previsto);
-      toast({ title: 'Sucesso', description: 'Parcela marcada como paga', variant: 'success' });
-      loadData();
-    } catch (error) {
-      toast({ title: 'Erro', description: 'Falha ao atualizar', variant: 'destructive' });
-    }
-  };
-
-  const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  const formatDate = (date: string) => new Date(date).toLocaleDateString('pt-BR');
+  const {
+    client,
+    responsibilities,
+    installments,
+    loading,
+    showForm,
+    setShowForm,
+    formData,
+    setFormData,
+    totals,
+    formatCurrency,
+    formatDate,
+    handleCreateResponsibility,
+    handlePayInstallment,
+  } = useClientFinance(clientId);
 
   if (loading) return <div className="p-8 text-center">Carregando...</div>;
   if (!client) return <div className="p-8 text-center">Cliente não encontrado</div>;
@@ -132,27 +43,21 @@ export function ClientFinancePage() {
             <DollarSign size={20} />
             <span className="font-semibold">Total a Receber</span>
           </div>
-          <p className="text-2xl font-bold">
-            {formatCurrency(installments.filter(i => i.status !== 'pago').reduce((acc, i) => acc + i.valor_previsto, 0))}
-          </p>
+          <p className="text-2xl font-bold">{formatCurrency(totals.aReceber)}</p>
         </div>
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 text-amber-600 mb-2">
             <AlertCircle size={20} />
             <span className="font-semibold">Parcelas em Atraso</span>
           </div>
-          <p className="text-2xl font-bold">
-            {installments.filter(i => i.status === 'atrasado').length}
-          </p>
+          <p className="text-2xl font-bold">{totals.atrasadas}</p>
         </div>
         <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
           <div className="flex items-center gap-2 text-blue-600 mb-2">
             <CheckCircle size={20} />
             <span className="font-semibold">Parcelas Pagas</span>
           </div>
-          <p className="text-2xl font-bold">
-            {installments.filter(i => i.status === 'pago').length}
-          </p>
+          <p className="text-2xl font-bold">{totals.pagas}</p>
         </div>
       </div>
 
@@ -231,8 +136,12 @@ export function ClientFinancePage() {
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">
-            <button onClick={() => setShowForm(false)} className="px-4 py-2 border border-slate-300 rounded-lg">Cancelar</button>
-            <button onClick={handleCreateResponsibility} className="px-4 py-2 bg-emerald-600 text-white rounded-lg">Salvar</button>
+            <button onClick={() => setShowForm(false)} className="px-4 py-2 border border-slate-300 rounded-lg">
+              Cancelar
+            </button>
+            <button onClick={handleCreateResponsibility} className="px-4 py-2 bg-emerald-600 text-white rounded-lg">
+              Salvar
+            </button>
           </div>
         </div>
       )}
@@ -242,11 +151,13 @@ export function ClientFinancePage() {
         <p className="text-center text-slate-500 py-8">Nenhuma obrigação financeira cadastrada.</p>
       ) : (
         <div className="space-y-6">
-          {responsibilities.map(resp => (
+          {responsibilities.map((resp) => (
             <div key={resp.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
               <div className="bg-slate-50 p-4 border-b">
                 <h3 className="font-bold text-slate-800">{resp.descricao}</h3>
-                <p className="text-sm text-slate-600">Total: {formatCurrency(resp.valor_total)} | Início: {formatDate(resp.data_inicio)}</p>
+                <p className="text-sm text-slate-600">
+                  Total: {formatCurrency(resp.valor_total)} | Início: {formatDate(resp.data_inicio)}
+                </p>
                 {resp.observacoes && <p className="text-xs text-slate-500 mt-1">{resp.observacoes}</p>}
               </div>
               <div className="overflow-x-auto">
@@ -264,24 +175,26 @@ export function ClientFinancePage() {
                   </thead>
                   <tbody>
                     {installments
-                      .filter(i => i.responsibility_id === resp.id)
-                      .map(inst => (
+                      .filter((i) => i.responsibility_id === resp.id)
+                      .map((inst) => (
                         <tr key={inst.id} className="border-t border-slate-100">
                           <td className="p-3">{inst.numero_parcela || '-'}</td>
                           <td className="p-3">{formatDate(inst.data_vencimento)}</td>
                           <td className="p-3 font-medium">{formatCurrency(inst.valor_previsto)}</td>
                           <td className="p-3">
-                            <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                              inst.status === 'pago' ? 'bg-emerald-100 text-emerald-700' :
-                              inst.status === 'atrasado' ? 'bg-red-100 text-red-700' :
-                              'bg-amber-100 text-amber-700'
-                            }`}>
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                inst.status === 'pago'
+                                  ? 'bg-emerald-100 text-emerald-700'
+                                  : inst.status === 'atrasado'
+                                  ? 'bg-red-100 text-red-700'
+                                  : 'bg-amber-100 text-amber-700'
+                              }`}
+                            >
                               {inst.status === 'pago' ? 'Pago' : inst.status === 'atrasado' ? 'Atrasado' : 'Pendente'}
                             </span>
                           </td>
-                          <td className="p-3">
-                            {inst.data_pagamento ? formatDate(inst.data_pagamento) : '-'}
-                          </td>
+                          <td className="p-3">{inst.data_pagamento ? formatDate(inst.data_pagamento) : '-'}</td>
                           <td className="p-3">
                             {inst.comprovante_id ? (
                               <button className="text-blue-600 hover:text-blue-800">

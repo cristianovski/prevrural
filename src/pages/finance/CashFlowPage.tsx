@@ -1,89 +1,31 @@
-// src/pages/finance/CashFlowPage.tsx
-import { useState, useEffect } from 'react';
 import { ArrowLeft, DollarSign, TrendingUp, TrendingDown, Calendar, Plus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { fetchInstallments, fetchExpenses, createExpense, payExpense } from '../../services/financeService';
-import { FinancialExpense, FinancialExpenseInput } from '../../types/finance';
-import { useToast } from '../../hooks/use-toast';
+import { useCashFlow } from '../../hooks/useCashFlow';
 import { getLocalDateISO } from '../../lib/utils';
 
 export function CashFlowPage() {
   const navigate = useNavigate();
-  const { toast } = useToast();
-  const [installments, setInstallments] = useState<any[]>([]);
-  const [expenses, setExpenses] = useState<FinancialExpense[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showExpenseForm, setShowExpenseForm] = useState(false);
-  const [expenseForm, setExpenseForm] = useState<Partial<FinancialExpenseInput>>({
-    descricao: '',
-    categoria: 'Custas',
-    valor: 0,
-    data_vencimento: getLocalDateISO(),
-    status: 'pendente'
-  });
-  const [filterMonth, setFilterMonth] = useState(getLocalDateISO().slice(0, 7)); // YYYY-MM
-
-  useEffect(() => {
-    loadData();
-  }, [filterMonth]);
-
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const [inst, exp] = await Promise.all([
-        fetchInstallments(),
-        fetchExpenses()
-      ]);
-      const [year, month] = filterMonth.split('-').map(Number);
-      const filteredInst = inst.filter(i => {
-        const d = new Date(i.data_vencimento);
-        return d.getFullYear() === year && d.getMonth() + 1 === month;
-      });
-      const filteredExp = exp.filter(e => {
-        const d = new Date(e.data_vencimento);
-        return d.getFullYear() === year && d.getMonth() + 1 === month;
-      });
-      setInstallments(filteredInst);
-      setExpenses(filteredExp);
-    } catch (error) {
-      toast({ title: 'Erro', description: 'Falha ao carregar dados', variant: 'destructive' });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const totalReceber = installments.filter(i => i.status !== 'pago').reduce((acc, i) => acc + i.valor_previsto, 0);
-  const totalPagar = expenses.filter(e => e.status !== 'pago').reduce((acc, e) => acc + e.valor, 0);
-  const saldoProjetado = totalReceber - totalPagar;
-
-  const handleCreateExpense = async () => {
-    if (!expenseForm.descricao || !expenseForm.valor || !expenseForm.data_vencimento) {
-      toast({ title: 'Atenção', description: 'Preencha descrição, valor e data', variant: 'destructive' });
-      return;
-    }
-    try {
-      await createExpense(expenseForm as FinancialExpenseInput);
-      toast({ title: 'Sucesso', description: 'Despesa cadastrada', variant: 'success' });
-      setShowExpenseForm(false);
-      setExpenseForm({ descricao: '', categoria: 'Custas', valor: 0, data_vencimento: getLocalDateISO(), status: 'pendente' });
-      loadData();
-    } catch (error) {
-      toast({ title: 'Erro', description: 'Não foi possível salvar', variant: 'destructive' });
-    }
-  };
-
-  const handlePayExpense = async (id: number) => {
-    try {
-      await payExpense(id, getLocalDateISO());
-      toast({ title: 'Sucesso', description: 'Despesa marcada como paga', variant: 'success' });
-      loadData();
-    } catch (error) {
-      toast({ title: 'Erro', description: 'Falha ao atualizar', variant: 'destructive' });
-    }
-  };
+  const {
+    loading,
+    installments,
+    expenses,
+    filterMonth,
+    setFilterMonth,
+    showExpenseForm,
+    setShowExpenseForm,
+    expenseForm,
+    setExpenseForm,
+    totalReceber,
+    totalPagar,
+    saldoProjetado,
+    handleCreateExpense,
+    handlePayExpense,
+  } = useCashFlow(getLocalDateISO().slice(0, 7));
 
   const formatCurrency = (value: number) => value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   const formatDate = (date: string) => new Date(date).toLocaleDateString('pt-BR');
+
+  if (loading) return <div className="p-8 text-center">Carregando...</div>;
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
@@ -189,8 +131,12 @@ export function CashFlowPage() {
             </div>
           </div>
           <div className="flex justify-end gap-2 mt-4">
-            <button onClick={() => setShowExpenseForm(false)} className="px-4 py-2 border border-slate-300 rounded-lg">Cancelar</button>
-            <button onClick={handleCreateExpense} className="px-4 py-2 bg-emerald-600 text-white rounded-lg">Salvar</button>
+            <button onClick={() => setShowExpenseForm(false)} className="px-4 py-2 border border-slate-300 rounded-lg">
+              Cancelar
+            </button>
+            <button onClick={handleCreateExpense} className="px-4 py-2 bg-emerald-600 text-white rounded-lg">
+              Salvar
+            </button>
           </div>
         </div>
       )}
@@ -211,9 +157,13 @@ export function CashFlowPage() {
           </thead>
           <tbody>
             {installments.length === 0 ? (
-              <tr><td colSpan={6} className="p-4 text-center text-slate-500">Nenhuma conta a receber</td></tr>
+              <tr>
+                <td colSpan={6} className="p-4 text-center text-slate-500">
+                  Nenhuma conta a receber
+                </td>
+              </tr>
             ) : (
-              installments.map(inst => (
+              installments.map((inst) => (
                 <tr key={inst.id} className="border-t border-slate-100">
                   <td className="p-3">{inst.responsibility?.client_id}</td>
                   <td className="p-3">{inst.responsibility?.descricao}</td>
@@ -221,11 +171,15 @@ export function CashFlowPage() {
                   <td className="p-3">{formatDate(inst.data_vencimento)}</td>
                   <td className="p-3 font-medium">{formatCurrency(inst.valor_previsto)}</td>
                   <td className="p-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      inst.status === 'pago' ? 'bg-emerald-100 text-emerald-700' :
-                      inst.status === 'atrasado' ? 'bg-red-100 text-red-700' :
-                      'bg-amber-100 text-amber-700'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        inst.status === 'pago'
+                          ? 'bg-emerald-100 text-emerald-700'
+                          : inst.status === 'atrasado'
+                          ? 'bg-red-100 text-red-700'
+                          : 'bg-amber-100 text-amber-700'
+                      }`}
+                    >
                       {inst.status === 'pago' ? 'Pago' : inst.status === 'atrasado' ? 'Atrasado' : 'Pendente'}
                     </span>
                   </td>
@@ -252,18 +206,24 @@ export function CashFlowPage() {
           </thead>
           <tbody>
             {expenses.length === 0 ? (
-              <tr><td colSpan={6} className="p-4 text-center text-slate-500">Nenhuma despesa cadastrada</td></tr>
+              <tr>
+                <td colSpan={6} className="p-4 text-center text-slate-500">
+                  Nenhuma despesa cadastrada
+                </td>
+              </tr>
             ) : (
-              expenses.map(exp => (
+              expenses.map((exp) => (
                 <tr key={exp.id} className="border-t border-slate-100">
                   <td className="p-3">{exp.descricao}</td>
                   <td className="p-3">{exp.categoria}</td>
                   <td className="p-3">{formatDate(exp.data_vencimento)}</td>
                   <td className="p-3 font-medium">{formatCurrency(exp.valor)}</td>
                   <td className="p-3">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      exp.status === 'pago' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
-                    }`}>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        exp.status === 'pago' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                      }`}
+                    >
                       {exp.status === 'pago' ? 'Pago' : 'Pendente'}
                     </span>
                   </td>

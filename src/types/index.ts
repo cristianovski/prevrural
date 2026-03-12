@@ -28,6 +28,8 @@ export interface Client {
   possui_outra_renda?: boolean;
   honorarios?: number;
   personal_docs?: Record<string, unknown>[];
+  resumo_cnis?: string;
+  detalhes_cnpj?: string;
   created_at: string;
   updated_at?: string;
 }
@@ -99,3 +101,11 @@ export interface LibraryThesis {
 
 export type ClientFormData = Omit<Client, 'id' | 'user_id' | 'created_at' | 'updated_at' | 'personal_docs'>;
 export type RuralFormData = Omit<Interview, 'id' | 'client_id' | 'created_at' | 'updated_at' | 'analise_periodos' | 'ai_summary'>;
+
+// NOVAS DEFINIÇÕES PARA O CLIENT LOADER
+export interface WithClientProps {
+  cliente: Client;
+  onBack: () => void;
+}
+
+export type ClientComponent = React.ComponentType<WithClientProps>;

@@ -12,7 +12,9 @@ import {
   HelpCircle, MapPin, Phone, PenTool, Shield, ShoppingBag, LayoutList,
   BookOpen, Sparkles, Settings, Underline, AlignLeft, AlignCenter,
   AlignJustify, Bold, Italic, List, ListOrdered, Undo, Redo, Indent,
-  Outdent, Type, Square, CheckSquare, DollarSign // ← ADICIONADO
+  Outdent, Type, Square, CheckSquare, DollarSign,
+  // NOVO ÍCONE PARA LINHA DO TEMPO
+  History
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { useToast } from "../hooks/use-toast";
@@ -426,7 +428,7 @@ export function DashboardPage() {
 
                       <div className="w-px h-6 bg-slate-200"></div>
 
-                      {/* Grupo 3: GED, Procuração, Dossiê e Financeiro */}
+                      {/* Grupo 3: GED, Procuração, Dossiê, Timeline e Financeiro */}
                       <div className="flex gap-1">
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate(`/documentos/${client.id}`); }}
@@ -449,7 +451,15 @@ export function DashboardPage() {
                         >
                           <BookCheck size={16} />
                         </button>
-                        {/* NOVO BOTÃO FINANCEIRO */}
+                        {/* NOVO BOTÃO LINHA DO TEMPO */}
+                        <button
+                          onClick={(e) => { e.stopPropagation(); navigate(`/linha-tempo/${client.id}`); }}
+                          className="p-2 rounded-lg bg-slate-50 text-slate-600 hover:bg-orange-50 hover:text-orange-600 transition-colors"
+                          title="Linha do Tempo"
+                        >
+                          <History size={16} />
+                        </button>
+                        {/* FINANCEIRO */}
                         <button
                           onClick={(e) => { e.stopPropagation(); navigate(`/cliente/${client.id}/financeiro`); }}
                           className="p-2 rounded-lg bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"

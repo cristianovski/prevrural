@@ -1,21 +1,32 @@
-// src/lib/aiService.ts
-// Serviço unificado para chamadas à API DeepSeek (compatível com OpenAI)
+import { Client, Interview } from '../types';
 
 const DEEPSEEK_API_KEY = import.meta.env.VITE_DEEPSEEK_API_KEY;
 const DEEPSEEK_API_URL = 'https://api.deepseek.com/v1/chat/completions';
-const MODEL = 'deepseek-chat'; // ou 'deepseek-reasoner' para modelos de raciocínio
+const MODEL = 'deepseek-chat';
 
-if (!DEEPSEEK_API_KEY) {
-  console.error('VITE_DEEPSEEK_API_KEY não encontrada no .env');
+if (!DEEPSEEK_API_KEY && import.meta.env.DEV) {
+  console.warn('⚠️ VITE_DEEPSEEK_API_KEY não encontrada no .env');
 }
 
-/**
- * Faz uma chamada genérica à API DeepSeek
- * @param messages Lista de mensagens no formato OpenAI
- * @param temperature Criatividade (0-2)
- * @returns Texto gerado
- */
-async function callDeepSeek(messages: { role: string; content: string }[], temperature = 0.7): Promise<string> {
+interface Message {
+  role: string;
+  content: string;
+}
+
+function calcularIdade(dataNasc: string): number {
+  if (!dataNasc) return 0;
+  const hoje = new Date();
+  const nasc = new Date(dataNasc);
+  let idade = hoje.getFullYear() - nasc.getFullYear();
+  const m = hoje.getMonth() - nasc.getMonth();
+  if (m < 0 || (m === 0 && hoje.getDate() < nasc.getDate())) idade--;
+  return idade;
+}
+
+async function callDeepSeek(messages: Message[], temperature = 0.7): Promise<string> {
+  if (!DEEPSEEK_API_KEY) {
+    throw new Error('Chave da DeepSeek não configurada. Verifique o arquivo .env');
+  }
   try {
     const response = await fetch(DEEPSEEK_API_URL, {
       method: 'POST',
@@ -30,12 +41,10 @@ async function callDeepSeek(messages: { role: string; content: string }[], tempe
         max_tokens: 4000,
       }),
     });
-
     if (!response.ok) {
       const error = await response.json();
       throw new Error(`DeepSeek API error: ${error.error?.message || response.statusText}`);
     }
-
     const data = await response.json();
     return data.choices[0].message.content;
   } catch (error) {
@@ -44,11 +53,7 @@ async function callDeepSeek(messages: { role: string; content: string }[], tempe
   }
 }
 
-/**
- * Gera um parecer jurídico com base nos dados do cliente e na tese selecionada
- * (usado em LegalOpinionPage)
- */
-export async function gerarParecerIA(cliente: any, teseJuridica: string) {
+export async function gerarParecerIA(cliente: Client, teseJuridica: string): Promise<string> {
   const prompt = `
     ATUE COMO AUDITOR FEDERAL RIGOROSO DO INSS.
     
@@ -57,14 +62,14 @@ export async function gerarParecerIA(cliente: any, teseJuridica: string) {
     
     --- 1. O SEGURADO ---
     Nome: ${cliente.nome}
-    Idade: ${cliente.idade_calculada}
-    Sexo: ${cliente.sexo}
-    Profissão: ${cliente.profissao}
+    Idade: ${cliente.data_nascimento ? calcularIdade(cliente.data_nascimento) : 'não informada'}
+    Sexo: ${cliente.sexo || 'não informado'}
+    Profissão: ${cliente.profissao || 'não informada'}
     CNIS Urbano: ${cliente.resumo_cnis || "Limpo"}
     CNPJ: ${cliente.possui_cnpj ? `SIM (${cliente.detalhes_cnpj})` : "NÃO"}
     
     --- 2. A PROVA ---
-    Documentos: ${JSON.stringify(cliente.docs_checklist)}
+    Documentos: ${JSON.stringify(cliente.personal_docs || [])}
 
     --- 3. REGRA APLICÁVEL ---
     "${teseJuridica}"
@@ -90,15 +95,14 @@ export async function gerarParecerIA(cliente: any, teseJuridica: string) {
     { role: 'system', content: 'Você é um assistente jurídico especializado em direito previdenciário rural.' },
     { role: 'user', content: prompt },
   ];
-
   return await callDeepSeek(messages, 0.3);
 }
 
-/**
- * Preenche um modelo de documento com dados do cliente e do escritório
- * (usado em DocumentsPage)
- */
-export async function gerarDocumentoIA(cliente: any, officeProfile: any, rawTemplate: string): Promise<string> {
+export async function gerarDocumentoIA(
+  cliente: Client,
+  officeProfile: { nome_advogado?: string; oab?: string; endereco_profissional?: string; cidade_uf?: string },
+  rawTemplate: string
+): Promise<string> {
   const prompt = `
     Aja como um Assistente Jurídico Expert.
     
@@ -114,10 +118,10 @@ export async function gerarDocumentoIA(cliente: any, officeProfile: any, rawTemp
     RG: ${cliente.rg || "Não informado"}
     
     2. DADOS DO ESCRITÓRIO/ADVOGADO (CONTRATADA):
-    Nome do Advogado(s): ${officeProfile.nome_advogado}
-    OAB: ${officeProfile.oab}
-    Endereço Profissional: ${officeProfile.endereco_profissional}
-    Cidade/UF: ${officeProfile.cidade_uf}
+    Nome do Advogado(s): ${officeProfile.nome_advogado || ''}
+    OAB: ${officeProfile.oab || ''}
+    Endereço Profissional: ${officeProfile.endereco_profissional || ''}
+    Cidade/UF: ${officeProfile.cidade_uf || ''}
     
     3. MODELO BRUTO:
     """
@@ -136,24 +140,19 @@ export async function gerarDocumentoIA(cliente: any, officeProfile: any, rawTemp
     { role: 'system', content: 'Você é um assistente especializado em gerar documentos jurídicos.' },
     { role: 'user', content: prompt },
   ];
-
   return await callDeepSeek(messages, 0.5);
 }
 
-/**
- * Gera um resumo executivo do caso com base nos dados da entrevista
- * (usado em MasterReportPage)
- */
-export async function gerarResumoIA(cliente: any, interview: any): Promise<string> {
+export async function gerarResumoIA(cliente: Client, interview: any): Promise<string> {
   const prompt = `
     Atue como um advogado sênior previdenciarista.
     Leia os dados fáticos do cliente rural e crie um "Resumo Executivo do Caso" em 1 parágrafo (máx 5 linhas).
     O objetivo é que outro advogado leia e entenda a história de vida rural da pessoa instantaneamente.
     
-    Cliente: ${cliente.nome}, Nascido em: ${cliente.data_nascimento}.
-    Propriedade: ${interview.dados_rurais?.nome_imovel} (${interview.dados_rurais?.area_total} Ha). Condição: ${interview.dados_rurais?.condicao_posse}.
-    Culturas: ${interview.dados_rurais?.culturas}. Destino: ${interview.dados_rurais?.destinacao}.
-    História contada: ${interview.historico_locais}
+    Cliente: ${cliente.nome}, Nascido em: ${cliente.data_nascimento || ''}.
+    Propriedade: ${interview.dados_rurais?.nome_imovel || ''} (${interview.dados_rurais?.area_total || ''} Ha). Condição: ${interview.dados_rurais?.condicao_posse || ''}.
+    Culturas: ${interview.dados_rurais?.culturas || ''}. Destino: ${interview.dados_rurais?.destinacao || ''}.
+    História contada: ${interview.historico_locais || ''}
     
     Gere apenas o texto do resumo, sem introduções ou saudações. Tom profissional e direto.
   `;
@@ -162,14 +161,9 @@ export async function gerarResumoIA(cliente: any, interview: any): Promise<strin
     { role: 'system', content: 'Você é um advogado especialista em direito previdenciário rural.' },
     { role: 'user', content: prompt },
   ];
-
   return await callDeepSeek(messages, 0.4);
 }
 
-/**
- * Função de fallback que tenta gerar com diferentes parâmetros
- * (usado em DocumentsPage para compatibilidade)
- */
 export async function generateWithFallback(prompt: string): Promise<string> {
   const messages = [
     { role: 'system', content: 'Você é um assistente jurídico.' },
