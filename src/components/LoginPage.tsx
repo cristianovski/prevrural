@@ -41,8 +41,9 @@ export function LoginPage() {
         });
         if (error) throw error;
       }
-    } catch (error: any) {
-      setMsg("❌ " + error.message);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "Ocorreu um erro desconhecido";
+      setMsg("❌ " + errorMessage);
     } finally {
       setLoading(false);
     }

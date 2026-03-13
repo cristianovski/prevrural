@@ -7,7 +7,7 @@ import {
 import { supabase } from "../../lib/supabase";
 import { analisarViabilidade, AnalysisResult, ClientData } from "../../utils/benefitRules"; 
 import { useToast } from "../../hooks/use-toast";
-import { Client } from "../../types";
+import { Client, ClientDocument, LibraryThesis } from "../../types";
 
 interface LegalOpinionPageProps {
   cliente: Client;
@@ -32,14 +32,14 @@ export function LegalOpinionPage({ cliente, onBack }: LegalOpinionPageProps) {
   const [lastAnalysisDate, setLastAnalysisDate] = useState<string | null>(null);
   
   // Documentos
-  const [documents, setDocuments] = useState<any[]>([]);
+  const [documents, setDocuments] = useState<ClientDocument[]>([]);
   const [selectedDocs, setSelectedDocs] = useState<string[]>([]);
   const [failedDocs, setFailedDocs] = useState<string[]>([]);
   const [ocrTexts, setOcrTexts] = useState<Record<string, string>>({});
   const [showOcr, setShowOcr] = useState<string | null>(null);
   
   // Teses da Biblioteca
-  const [theses, setTheses] = useState<any[]>([]);
+  const [theses, setTheses] = useState<LibraryThesis[]>([]);
   const [selectedThesisId, setSelectedThesisId] = useState<string>("");
 
   // Entradas Manuais para o Simulador

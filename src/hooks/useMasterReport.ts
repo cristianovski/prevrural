@@ -51,8 +51,8 @@ export function useMasterReport(cliente: Client) {
     if (cliente?.id) fetchData();
   }, [cliente]);
 
-  const getStart = (p: any) => p.inicio || p.start_date || '';
-  const getEnd = (p: any) => p.fim || p.end_date || '';
+  const getStart = (p: Record<string, unknown>) => String(p.inicio || p.start_date || '');
+  const getEnd = (p: Record<string, unknown>) => String(p.fim || p.end_date || '');
 
   const fetchData = async () => {
     setLoading(true);

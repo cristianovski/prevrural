@@ -90,7 +90,7 @@ export interface ClientInterviewData {
   historico_locais: string;
   timeline_json: ClientTimelineItem[];
   dados_rurais: ClientRuralData;
-  analise_periodos?: any[]; // Refinar depois
-  analise_params?: any;
+  analise_periodos?: Record<string, unknown>[];
+  analise_params?: Record<string, unknown>;
   updated_at?: string;
 }

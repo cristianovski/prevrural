@@ -36,16 +36,16 @@ export function useTimeline(cliente: Client) {
       // 1. Da entrevista
       const interviewData = interviewRes.data;
       if (interviewData?.timeline_json && Array.isArray(interviewData.timeline_json)) {
-        const docsFicha = interviewData.timeline_json.map((doc: Record<string, any>) => ({
-          id: doc.id || Math.random().toString(),
-          type: doc.type || "Registro Ficha",
-          customName: doc.description || "",
-          issueDate: doc.issueDate || (doc.year ? `${doc.year}-01-01` : 'S/D'),
-          displayYear: doc.year || (doc.issueDate ? doc.issueDate.split('-')[0] : "?"),
-          fileUrl: doc.fileUrl || null,
-          fileName: doc.fileName || null,
+        const docsFicha = interviewData.timeline_json.map((doc: Record<string, unknown>) => ({
+          id: String(doc.id || Math.random().toString()),
+          type: String(doc.type || "Registro Ficha"),
+          customName: String(doc.description || ""),
+          issueDate: String(doc.issueDate || (doc.year ? `${doc.year}-01-01` : 'S/D')),
+          displayYear: doc.year ? String(doc.year) : (doc.issueDate ? String(doc.issueDate).split('-')[0] : "?"),
+          fileUrl: doc.fileUrl ? String(doc.fileUrl) : null,
+          fileName: doc.fileName ? String(doc.fileName) : null,
           source: 'Entrevista Rural',
-          law: doc.law || ""
+          law: doc.law ? String(doc.law) : ""
         }));
         combinedDocs = [...combinedDocs, ...docsFicha];
       }
@@ -53,14 +53,14 @@ export function useTimeline(cliente: Client) {
       // 2. Do cadastro legado
       const clientData = clientRes.data;
       if (clientData?.personal_docs && Array.isArray(clientData.personal_docs)) {
-        const docsCadastro = clientData.personal_docs.map((doc: Record<string, any>, idx: number) => ({
+        const docsCadastro = clientData.personal_docs.map((doc: Record<string, unknown>, idx: number) => ({
           id: `ged-${idx}`,
-          type: doc.category || "Documento Pessoal",
-          customName: doc.name || "Upload",
-          issueDate: doc.issueDate || new Date().toISOString().split('T')[0],
-          displayYear: doc.issueDate ? doc.issueDate.split('-')[0] : new Date().getFullYear(),
-          fileUrl: doc.url || null,
-          fileName: doc.fileName || "arquivo_anexo",
+          type: String(doc.category || "Documento Pessoal"),
+          customName: String(doc.name || "Upload"),
+          issueDate: String(doc.issueDate || new Date().toISOString().split('T')[0]),
+          displayYear: doc.issueDate ? String(doc.issueDate).split('-')[0] : new Date().getFullYear(),
+          fileUrl: doc.url ? String(doc.url) : null,
+          fileName: String(doc.fileName || "arquivo_anexo"),
           source: 'GED / Cadastro',
           law: ""
         }));
@@ -70,14 +70,14 @@ export function useTimeline(cliente: Client) {
       // 3. Da nova tabela client_documents
       const newDocs = newDocsRes.data;
       if (newDocs) {
-        const docsDb = newDocs.map((doc: Record<string, any>) => ({
-          id: doc.id,
-          type: doc.category || "Geral",
-          customName: doc.title || doc.original_name || "Sem Título",
-          issueDate: doc.reference_date || doc.created_at,
-          displayYear: new Date(doc.reference_date || doc.created_at).getFullYear(),
-          fileUrl: doc.file_url || null,
-          fileName: doc.title || doc.original_name || "arquivo",
+        const docsDb = newDocs.map((doc: Record<string, unknown>) => ({
+          id: String(doc.id),
+          type: String(doc.category || "Geral"),
+          customName: String(doc.title || doc.original_name || "Sem Título"),
+          issueDate: String(doc.reference_date || doc.created_at),
+          displayYear: new Date(String(doc.reference_date || doc.created_at)).getFullYear(),
+          fileUrl: doc.file_url ? String(doc.file_url) : null,
+          fileName: String(doc.title || doc.original_name || "arquivo"),
           source: 'GED (Novo)',
           law: ""
         }));

@@ -143,7 +143,7 @@ export async function gerarDocumentoIA(
   return await callDeepSeek(messages, 0.5);
 }
 
-export async function gerarResumoIA(cliente: Client, interview: any): Promise<string> {
+export async function gerarResumoIA(cliente: Client, interview: Interview): Promise<string> {
   const prompt = `
     Atue como um advogado sênior previdenciarista.
     Leia os dados fáticos do cliente rural e crie um "Resumo Executivo do Caso" em 1 parágrafo (máx 5 linhas).
