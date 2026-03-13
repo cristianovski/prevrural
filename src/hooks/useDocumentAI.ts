@@ -13,8 +13,7 @@ export function useDocumentAI() {
     template: string
   ) => {
     if (!officeProfile) {
-      alert('Por favor, configure os dados do escritório antes de gerar documentos.');
-      return false;
+      throw new Error('Configure os dados do escritório antes de gerar documentos.');
     }
 
     setGenerating(true);
@@ -63,8 +62,7 @@ export function useDocumentAI() {
       return true;
     } catch (error) {
       const msg = error instanceof Error ? error.message : 'Erro na geração do documento.';
-      alert(msg);
-      return false;
+      throw new Error(msg);
     } finally {
       setGenerating(false);
     }
