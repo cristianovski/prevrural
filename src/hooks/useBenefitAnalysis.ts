@@ -153,7 +153,7 @@ export function useBenefitAnalysis(cliente: Client) {
       if (dias <= 120) isSafra = true;
     }
     const item: Periodo = {
-      id: editingId || Math.random().toString(36).substr(2, 9),
+      id: editingId || crypto.randomUUID(),
       inicio: form.inicio!,
       fim: form.fim!,
       tipo: form.tipo as PeriodoType,

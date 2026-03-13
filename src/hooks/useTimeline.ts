@@ -37,7 +37,7 @@ export function useTimeline(cliente: Client) {
       const interviewData = interviewRes.data;
       if (interviewData?.timeline_json && Array.isArray(interviewData.timeline_json)) {
         const docsFicha = interviewData.timeline_json.map((doc: Record<string, any>) => ({
-          id: doc.id || Math.random().toString(),
+          id: doc.id || crypto.randomUUID(),
           type: doc.type || "Registro Ficha",
           customName: doc.description || "",
           issueDate: doc.issueDate || (doc.year ? `${doc.year}-01-01` : 'S/D'),
