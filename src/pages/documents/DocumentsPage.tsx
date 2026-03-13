@@ -12,6 +12,7 @@ import { useOfficeProfile } from '../../hooks/useOfficeProfile';
 import { useDocumentTemplates } from '../../hooks/useDocumentTemplates';
 import { useDocumentAI } from '../../hooks/useDocumentAI';
 import { useChatAI } from '../../hooks/useChatAI';
+import { useToast } from '../../hooks/use-toast';
 
 interface DocumentsPageProps {
   cliente: Client;
@@ -26,6 +27,7 @@ interface ToolBtnProps {
 
 export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const {
     officeProfile,
@@ -111,6 +113,15 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
   const execCmd = (cmd: string, val?: string) => {
     document.execCommand(cmd, false, val);
     editorRef.current?.focus();
+  };
+
+  const handleSaveOfficeProfile = async () => {
+    try {
+      await saveOfficeProfile();
+      toast({ title: 'Sucesso', description: 'Dados do escritório salvos!', variant: 'success' });
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Erro ao salvar. Tente novamente.', variant: 'destructive' });
+    }
   };
 
   const ToolBtn = ({ cmd, icon: Icon, title }: ToolBtnProps) => (
@@ -343,7 +354,7 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
                 />
               </div>
               <button
-                onClick={saveOfficeProfile}
+                onClick={handleSaveOfficeProfile}
                 className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-500 flex items-center justify-center gap-2"
               >
                 <Save size={18} /> Salvar Configuração
