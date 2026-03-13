@@ -5,7 +5,7 @@ import {
   UploadCloud, X
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { LibraryThesis } from "../../types"; // FIX: Importamos a Interface Global
+import type { LibraryThesis } from "../../types"; // FIX: Importamos a Interface Global
 
 interface LibraryPageProps {
   onBack: () => void;
