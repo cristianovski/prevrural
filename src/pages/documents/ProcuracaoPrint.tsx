@@ -5,6 +5,7 @@ import { useProcuracaoData } from '../../hooks/useProcuracaoData';
 import { ModeloSelector } from './ModeloSelector'; // Ajustado: mesmo diretório
 import { ProcuracaoAdJudicia } from './ProcuracaoAdJudicia'; // Ajustado
 import { TermoINSS } from './TermoINSS'; // Ajustado
+import { AutodeclaracaoRural } from './AutodeclaracaoRural';
 
 interface ProcuracaoProps {
   cliente: Client;
@@ -103,8 +104,12 @@ export function ProcuracaoPrint({ cliente, onBack }: ProcuracaoProps) {
               dataExtenso={dataExtenso}
             />
           ) : modeloAtual.layout === 'autodeclaracao' ? (
-            // Placeholder para autodeclaração – você pode criar um componente separado depois
-            <div>Autodeclaração (em breve)</div>
+            <AutodeclaracaoRural
+              cliente={cliente}
+              timeline={timeline}
+              cidade={cidade}
+              dataExtenso={dataExtenso}
+            />
           ) : (
             <ProcuracaoAdJudicia
               cliente={cliente}
