@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, ChangeEvent } from "react";
 import { 
   ArrowLeft, Plus, Trash2, User, FileText, 
   Hash, Briefcase, Save, Building
@@ -104,8 +104,7 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
       setFormData({ nome: "", nacionalidade: "Brasileiro", estado_civil: "Casado", oab: "", cpf: "" });
   };
 
-  // FIX: Tipagem do evento DOM
-  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCpfChange = (e: ChangeEvent<HTMLInputElement>) => {
     let v = e.target.value.replace(/\D/g, "");
     if (v.length > 11) v = v.slice(0, 11);
     v = v.replace(/(\d{3})(\d)/, "$1.$2");
