@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { Loader2 } from 'lucide-react';
 
 export function ProtectedRoute() {
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

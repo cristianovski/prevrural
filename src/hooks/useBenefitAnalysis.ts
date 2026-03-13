@@ -78,13 +78,13 @@ export function useBenefitAnalysis(cliente: Client) {
       const newDocs = newDocsRes.data;
       if (newDocs) {
         const docsDb = newDocs
-          .filter((doc: any) => doc.category === 'Provas')
-          .map((doc: any) => ({
-            id: doc.id,
-            type: doc.title || doc.original_name || 'Sem Título',
-            issueDate: doc.reference_date || doc.created_at,
-            displayYear: new Date(doc.reference_date || doc.created_at).getFullYear(),
-            fileUrl: doc.file_url || null,
+          .filter((doc: Record<string, unknown>) => doc.category === 'Provas')
+          .map((doc: Record<string, unknown>) => ({
+            id: String(doc.id),
+            type: String(doc.title || doc.original_name || 'Sem Título'),
+            issueDate: String(doc.reference_date || doc.created_at),
+            displayYear: new Date(String(doc.reference_date || doc.created_at)).getFullYear(),
+            fileUrl: doc.file_url ? String(doc.file_url) : null,
             origem: 'GED (Novo)',
           }));
         docsDb.sort((a, b) => new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime());
