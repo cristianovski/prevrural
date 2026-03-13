@@ -12,6 +12,7 @@ import { useOfficeProfile } from '../../hooks/useOfficeProfile';
 import { useDocumentTemplates } from '../../hooks/useDocumentTemplates';
 import { useDocumentAI } from '../../hooks/useDocumentAI';
 import { useChatAI } from '../../hooks/useChatAI';
+import { sanitizeHtml } from '../../utils/sanitize';
 
 interface DocumentsPageProps {
   cliente: Client;
@@ -22,7 +23,14 @@ interface ToolBtnProps {
   cmd: string;
   icon: React.ElementType;
   title?: string;
+  onClick: (cmd: string) => void;
 }
+
+const ToolBtn = ({ cmd, icon: Icon, title, onClick }: ToolBtnProps) => (
+  <button onClick={() => onClick(cmd)} className="p-1.5 hover:bg-slate-100 rounded text-slate-600" title={title}>
+    <Icon size={16} />
+  </button>
+);
 
 export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
   const editorRef = useRef<HTMLDivElement>(null);
@@ -64,7 +72,7 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
   useEffect(() => {
     if (!generating && editorRef.current && documentHtml) {
       if (editorRef.current.innerHTML !== documentHtml) {
-        editorRef.current.innerHTML = documentHtml;
+        editorRef.current.innerHTML = sanitizeHtml(documentHtml);
       }
     }
   }, [generating, documentHtml]);
@@ -84,8 +92,9 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
     const currentContent = editorRef.current?.innerHTML || documentHtml;
     const newHtml = await sendMessage(currentContent);
     if (newHtml) {
-      setDocumentHtml(newHtml);
-      if (editorRef.current) editorRef.current.innerHTML = newHtml;
+      const safeHtml = sanitizeHtml(newHtml);
+      setDocumentHtml(safeHtml);
+      if (editorRef.current) editorRef.current.innerHTML = safeHtml;
     }
   };
 
@@ -112,12 +121,6 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
     document.execCommand(cmd, false, val);
     editorRef.current?.focus();
   };
-
-  const ToolBtn = ({ cmd, icon: Icon, title }: ToolBtnProps) => (
-    <button onClick={() => execCmd(cmd)} className="p-1.5 hover:bg-slate-100 rounded text-slate-600" title={title}>
-      <Icon size={16} />
-    </button>
-  );
 
   return (
     <div className="flex flex-col h-full bg-slate-100 font-sans">
@@ -196,22 +199,22 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
         <main className="flex-1 overflow-y-auto bg-slate-200/50 flex flex-col items-center p-6 md:p-10 relative">
           <div className="sticky top-0 mb-4 bg-white p-1.5 rounded-lg shadow-md border border-slate-200 flex flex-wrap gap-1 z-20 max-w-[21cm]">
             <div className="flex gap-0.5 border-r pr-1 mr-1">
-              <ToolBtn cmd="undo" icon={Undo} />
-              <ToolBtn cmd="redo" icon={Redo} />
+              <ToolBtn onClick={execCmd} cmd="undo" icon={Undo} />
+              <ToolBtn onClick={execCmd} cmd="redo" icon={Redo} />
             </div>
             <div className="flex gap-0.5 border-r pr-1 mr-1">
-              <ToolBtn cmd="bold" icon={Bold} />
-              <ToolBtn cmd="italic" icon={Type} />
-              <ToolBtn cmd="underline" icon={Underline} />
+              <ToolBtn onClick={execCmd} cmd="bold" icon={Bold} />
+              <ToolBtn onClick={execCmd} cmd="italic" icon={Type} />
+              <ToolBtn onClick={execCmd} cmd="underline" icon={Underline} />
             </div>
             <div className="flex gap-0.5 border-r pr-1 mr-1">
-              <ToolBtn cmd="justifyLeft" icon={AlignLeft} />
-              <ToolBtn cmd="justifyCenter" icon={AlignCenter} />
-              <ToolBtn cmd="justifyFull" icon={AlignJustify} />
+              <ToolBtn onClick={execCmd} cmd="justifyLeft" icon={AlignLeft} />
+              <ToolBtn onClick={execCmd} cmd="justifyCenter" icon={AlignCenter} />
+              <ToolBtn onClick={execCmd} cmd="justifyFull" icon={AlignJustify} />
             </div>
             <div className="flex gap-0.5">
-              <ToolBtn cmd="outdent" icon={Outdent} />
-              <ToolBtn cmd="indent" icon={Indent} />
+              <ToolBtn onClick={execCmd} cmd="outdent" icon={Outdent} />
+              <ToolBtn onClick={execCmd} cmd="indent" icon={Indent} />
             </div>
           </div>
 

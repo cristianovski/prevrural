@@ -7,6 +7,7 @@ export interface UnifiedTimelineItem {
   type: string;
   customName: string;
   issueDate: string;
+  endDate?: string;
   displayYear: string | number;
   fileUrl: string | null;
   fileName: string | null;
