@@ -46,7 +46,7 @@ const LEGAL_BASIS: Record<string, { law: string; obs: string }> = {
   // ... (complete com as demais se quiser, mas não é obrigatório para o funcionamento)
 };
 
-export function useDocumentEditor(onSuccess: () => void) {
+export function useDocumentEditor(onSuccess: () => void, confirmFn: (msg: string) => Promise<boolean>) {
   const { toast } = useToast();
   const [selectedDoc, setSelectedDoc] = useState<ClientDocument | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -113,7 +113,7 @@ export function useDocumentEditor(onSuccess: () => void) {
 
   const handleDeleteDoc = async () => {
     if (!selectedDoc) return;
-    if (!confirm('Excluir este documento permanentemente?')) return;
+    if (!(await confirmFn('Excluir este documento permanentemente?'))) return;
     setSaving(true);
 
     try {
