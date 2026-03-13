@@ -1,5 +1,10 @@
 // src/types/client.ts
 
+import { Client } from './index';
+
+export type ClientInsert = Omit<Client, 'id' | 'created_at' | 'updated_at' | 'user_id'> & { user_id: string };
+export type ClientUpdate = Partial<ClientInsert>;
+
 export type ClientStatus = 'A Iniciar' | 'Em Andamento' | 'Finalizado' | 'Suspenso';
 
 export interface ClientCivilData {
