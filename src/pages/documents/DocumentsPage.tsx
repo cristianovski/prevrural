@@ -12,6 +12,7 @@ import { useOfficeProfile } from '../../hooks/useOfficeProfile';
 import { useDocumentTemplates } from '../../hooks/useDocumentTemplates';
 import { useDocumentAI } from '../../hooks/useDocumentAI';
 import { useChatAI } from '../../hooks/useChatAI';
+import { useToast } from '../../hooks/use-toast';
 
 interface DocumentsPageProps {
   cliente: Client;
@@ -26,6 +27,7 @@ interface ToolBtnProps {
 
 export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
   const editorRef = useRef<HTMLDivElement>(null);
+  const { toast } = useToast();
 
   const {
     officeProfile,
@@ -74,9 +76,14 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
     const template = templates.find(t => t.id === templateId);
     if (!template) return;
 
-    const success = await generateDocument(cliente, officeProfile, template.content);
-    if (success) {
-      // documento gerado com sucesso
+    try {
+      await generateDocument(cliente, officeProfile, template.content);
+    } catch (error) {
+      toast({
+        title: "Erro",
+        description: error instanceof Error ? error.message : "Erro na geração do documento.",
+        variant: "destructive"
+      });
     }
   };
 
