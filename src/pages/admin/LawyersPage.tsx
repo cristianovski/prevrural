@@ -5,6 +5,9 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { Lawyer } from "../../types"; // FIX: Usar a Interface Global
+import { useToast } from "../../hooks/use-toast";
+import { useConfirm } from "../../hooks/useConfirm";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 
 // FIX: Estender a interface global para suportar o campo nacionalidade apenas neste ecrã
 interface LawyerExtended extends Lawyer {
@@ -31,6 +34,8 @@ function validarCPF(cpf: string) {
 }
 
 export function LawyersPage({ onBack }: { onBack: () => void }) {
+  const { toast } = useToast();
+  const { confirm } = useConfirm();
   const [lawyers, setLawyers] = useState<LawyerExtended[]>([]); // FIX: Array Tipado
   const [loading, setLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -60,8 +65,8 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
   };
 
   const handleSaveLawyer = async () => {
-    if (!formData.nome || !formData.oab || !formData.cpf) return alert("Nome, OAB e CPF são obrigatórios.");
-    if (!validarCPF(formData.cpf)) return alert("CPF inválido!");
+    if (!formData.nome || !formData.oab || !formData.cpf) return toast({ title: "Erro", description: "Nome, OAB e CPF são obrigatórios.", variant: "destructive" });
+    if (!validarCPF(formData.cpf)) return toast({ title: "Erro", description: "CPF inválido!", variant: "destructive" });
 
     setSaving(true);
     const payload = {
@@ -85,7 +90,7 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
 
   const handleSaveAddress = () => {
       localStorage.setItem("officeAddress", officeAddress);
-      alert("Endereço do escritório atualizado!");
+      toast({ title: "Sucesso", description: "Endereço do escritório atualizado!", variant: "success" });
   };
 
   const handleEdit = (lawyer: LawyerExtended) => {
@@ -94,7 +99,8 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
   };
 
   const handleDelete = async (id: number) => {
-      if (confirm("Remover este advogado?")) {
+      const isConfirmed = await confirm("Remover este advogado?");
+      if (isConfirmed) {
           await supabase.from('lawyers').delete().eq('id', id);
           fetchLawyers();
       }
@@ -197,6 +203,7 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
             </div>
         </div>
       )}
+      <ConfirmDialog />
     </div>
   );
 }
