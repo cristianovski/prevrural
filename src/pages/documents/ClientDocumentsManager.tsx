@@ -8,6 +8,7 @@ import { Client, ClientDocument } from '../../types';
 import { useDocuments } from '../../hooks/useDocuments';
 import { useDocumentUpload } from '../../hooks/useDocumentUpload';
 import { useDocumentEditor } from '../../hooks/useDocumentEditor';
+import { useConfirm } from '../../hooks/useConfirm';
 import { getLocalDateISO } from '../../lib/utils';
 
 interface PageProps {
@@ -27,6 +28,8 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
     setSearchTerm,
     refresh,
   } = useDocuments(cliente.id);
+
+  const { confirm } = useConfirm();
 
   const {
     uploading,
@@ -51,7 +54,7 @@ export function ClientDocumentsManager({ cliente, onBack }: PageProps) {
     getLegalInfo,
     setIsEditing,
     OPCOES_DOCUMENTOS,
-  } = useDocumentEditor(refresh);
+  } = useDocumentEditor(refresh, confirm);
 
   const formatDate = (date?: string | null) => {
     if (!date) return 'S/D';
