@@ -12,6 +12,7 @@ import { useOfficeProfile } from '../../hooks/useOfficeProfile';
 import { useDocumentTemplates } from '../../hooks/useDocumentTemplates';
 import { useDocumentAI } from '../../hooks/useDocumentAI';
 import { useChatAI } from '../../hooks/useChatAI';
+import { useToast } from '../../hooks/use-toast';
 
 interface DocumentsPageProps {
   cliente: Client;
@@ -61,6 +62,8 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
     sendMessage,
   } = useChatAI();
 
+  const { toast } = useToast();
+
   useEffect(() => {
     if (!generating && editorRef.current && documentHtml) {
       if (editorRef.current.innerHTML !== documentHtml) {
@@ -74,9 +77,15 @@ export function DocumentsPage({ cliente, onBack }: DocumentsPageProps) {
     const template = templates.find(t => t.id === templateId);
     if (!template) return;
 
-    const success = await generateDocument(cliente, officeProfile, template.content);
-    if (success) {
+    try {
+      await generateDocument(cliente, officeProfile, template.content);
       // documento gerado com sucesso
+    } catch (error) {
+      toast({
+        title: "Erro na geração do documento",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+        variant: "destructive"
+      });
     }
   };
 
