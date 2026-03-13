@@ -5,6 +5,7 @@ import { useProcuracaoData } from '../../hooks/useProcuracaoData';
 import { ModeloSelector } from './ModeloSelector'; // Ajustado: mesmo diretório
 import { ProcuracaoAdJudicia } from './ProcuracaoAdJudicia'; // Ajustado
 import { TermoINSS } from './TermoINSS'; // Ajustado
+import { AutodeclaracaoRural } from './AutodeclaracaoRural';
 
 interface ProcuracaoProps {
   cliente: Client;
@@ -94,7 +95,14 @@ export function ProcuracaoPrint({ cliente, onBack }: ProcuracaoProps) {
 
       <div className="flex-1 p-8 overflow-y-auto print:p-0 print:overflow-visible flex justify-center">
         <div className="bg-white w-[210mm] min-h-[297mm] p-[15mm] shadow-2xl print:shadow-none print:w-full text-black leading-relaxed text-justify font-serif text-[11pt]">
-          {modeloAtual.layout === 'termo_inss' ? (
+          {modeloAtual.layout === 'autodeclaracao' ? (
+            <AutodeclaracaoRural
+              cliente={cliente}
+              timeline={timeline}
+              cidade={cidade}
+              dataExtenso={dataExtenso}
+            />
+          ) : modeloAtual.layout === 'termo_inss' ? (
             <TermoINSS
               cliente={cliente}
               lawyers={lawyers}
@@ -102,9 +110,6 @@ export function ProcuracaoPrint({ cliente, onBack }: ProcuracaoProps) {
               cidade={cidade}
               dataExtenso={dataExtenso}
             />
-          ) : modeloAtual.layout === 'autodeclaracao' ? (
-            // Placeholder para autodeclaração – você pode criar um componente separado depois
-            <div>Autodeclaração (em breve)</div>
           ) : (
             <ProcuracaoAdJudicia
               cliente={cliente}
