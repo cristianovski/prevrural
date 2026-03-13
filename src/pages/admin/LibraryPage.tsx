@@ -6,6 +6,8 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { LibraryThesis } from "../../types"; // FIX: Importamos a Interface Global
+import { useToast } from "../../hooks/use-toast";
+import { useConfirm } from "../../hooks/use-confirm";
 
 interface LibraryPageProps {
   onBack: () => void;
@@ -16,6 +18,9 @@ export function LibraryPage({ onBack }: LibraryPageProps) {
   const [theses, setTheses] = useState<LibraryThesis[]>([]); // FIX: Tipagem forte
   const [searchTerm, setSearchTerm] = useState("");
   const [filterCategory, setFilterCategory] = useState("Todos");
+
+  const { toast } = useToast();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   // Modais
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -46,7 +51,7 @@ export function LibraryPage({ onBack }: LibraryPageProps) {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm("Tem certeza que deseja excluir esta tese?")) return;
+    if (!(await confirm({ title: "Excluir Tese", description: "Tem certeza que deseja excluir esta tese?" }))) return;
     await supabase.from('library_theses').delete().eq('id', id);
     fetchTheses();
   };
@@ -68,7 +73,7 @@ export function LibraryPage({ onBack }: LibraryPageProps) {
   };
 
   const handleSave = async () => {
-    if (!formTitle || !formContent) return alert("Preencha título e conteúdo.");
+    if (!formTitle || !formContent) return toast({ title: "Atenção", description: "Preencha título e conteúdo.", variant: "destructive" });
     const payload = { title: formTitle, category: formCategory, content: formContent, active: true };
 
     if (editingId) {
@@ -99,13 +104,13 @@ export function LibraryPage({ onBack }: LibraryPageProps) {
                   count++;
               }
           }
-          alert(`Sucesso! ${count} teses importadas.`);
+          toast({ title: "Sucesso!", description: `${count} teses importadas com sucesso.`, variant: "success" });
           setIsImportOpen(false);
           setImportJson("");
           fetchTheses();
       } catch (err: unknown) { // FIX: Sem 'any' no catch
           const msg = err instanceof Error ? err.message : "Erro desconhecido";
-          alert("Erro ao ler o JSON: " + msg);
+          toast({ title: "Erro", description: "Erro ao ler o JSON: " + msg, variant: "destructive" });
       }
   };
 
@@ -200,6 +205,8 @@ export function LibraryPage({ onBack }: LibraryPageProps) {
               </div>
           )}
       </main>
+
+      <ConfirmDialog />
 
       {/* MODAL DE EDIÇÃO */}
       {isModalOpen && (
