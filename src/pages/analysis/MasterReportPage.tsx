@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useMasterReport } from '../../hooks/useMasterReport';
 import { Client } from '../../types';
+import { useToast } from '../../hooks/use-toast';
 
 interface ReportProps {
   cliente: Client;
@@ -21,6 +22,7 @@ interface ReportProps {
 }
 
 export function MasterReportPage({ cliente, onBack }: ReportProps) {
+  const { toast } = useToast();
   const {
     loading,
     interview,
@@ -42,6 +44,22 @@ export function MasterReportPage({ cliente, onBack }: ReportProps) {
     month: 'long',
     year: 'numeric',
   });
+
+  const handleGenerateAiSummary = async () => {
+    try {
+      await generateAiSummary();
+      toast({
+        title: 'Sucesso',
+        description: 'Resumo gerado com sucesso.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Erro',
+        description: error.message || 'Falha ao gerar resumo.',
+        variant: 'destructive',
+      });
+    }
+  };
 
   if (loading) return <div className="p-10 text-center text-slate-500">Montando Dossiê...</div>;
 
@@ -85,7 +103,7 @@ export function MasterReportPage({ cliente, onBack }: ReportProps) {
           </div>
           <div className="mt-8 pt-4 border-t border-slate-200">
             <button
-              onClick={generateAiSummary}
+              onClick={handleGenerateAiSummary}
               disabled={generatingSummary}
               className="w-full bg-purple-100 hover:bg-purple-200 text-purple-800 p-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition disabled:opacity-50"
             >
