@@ -74,10 +74,9 @@ export function useOfficeProfile() {
 
       await loadOfficeProfile();
       setIsConfigOpen(false);
-      alert('Dados do escritório salvos!');
     } catch (error) {
       console.error('Erro ao salvar perfil:', error);
-      alert('Erro ao salvar. Tente novamente.');
+      throw error;
     }
   };
 
