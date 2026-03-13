@@ -104,7 +104,7 @@ export function useMasterReport(cliente: Client) {
   };
 
   const generateAiSummary = async () => {
-    if (!interview) return alert('Ficha de entrevista não encontrada.');
+    if (!interview) throw new Error('Ficha de entrevista não encontrada.');
     setGeneratingSummary(true);
     try {
       const text = await gerarResumoIA(cliente, interview);
@@ -112,7 +112,7 @@ export function useMasterReport(cliente: Client) {
       await supabase.from('interviews').update({ ai_summary: text }).eq('client_id', cliente.id);
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : 'Erro desconhecido';
-      alert('Falha ao gerar resumo: ' + msg);
+      throw new Error('Falha ao gerar resumo: ' + msg);
     } finally {
       setGeneratingSummary(false);
     }
