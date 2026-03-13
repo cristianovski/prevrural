@@ -19,7 +19,7 @@ export interface Periodo {
   law?: string;
 }
 
-interface DocumentTimelineItem {
+export interface DocumentTimelineItem {
   id: string;
   type: string;
   issueDate: string;
