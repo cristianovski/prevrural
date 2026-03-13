@@ -5,6 +5,9 @@ import {
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
 import { Lawyer } from "../../types"; // FIX: Usar a Interface Global
+import { useToast } from "../../hooks/use-toast";
+import { useConfirm } from "../../hooks/useConfirm";
+import { ConfirmDialog } from "../../components/ui/ConfirmDialog";
 
 // FIX: Estender a interface global para suportar o campo nacionalidade apenas neste ecrã
 interface LawyerExtended extends Lawyer {
@@ -46,6 +49,9 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
     cpf: ""
   });
 
+  const { toast } = useToast();
+  const { isOpen, config, confirm: confirmAction, handleConfirm, handleCancel } = useConfirm();
+
   useEffect(() => {
     fetchLawyers();
     const savedAddress = localStorage.getItem("officeAddress");
@@ -60,8 +66,12 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
   };
 
   const handleSaveLawyer = async () => {
-    if (!formData.nome || !formData.oab || !formData.cpf) return alert("Nome, OAB e CPF são obrigatórios.");
-    if (!validarCPF(formData.cpf)) return alert("CPF inválido!");
+    if (!formData.nome || !formData.oab || !formData.cpf) {
+      return toast({ title: "Erro", description: "Nome, OAB e CPF são obrigatórios.", variant: "destructive" });
+    }
+    if (!validarCPF(formData.cpf)) {
+      return toast({ title: "Erro", description: "CPF inválido!", variant: "destructive" });
+    }
 
     setSaving(true);
     const payload = {
@@ -85,7 +95,7 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
 
   const handleSaveAddress = () => {
       localStorage.setItem("officeAddress", officeAddress);
-      alert("Endereço do escritório atualizado!");
+      toast({ title: "Sucesso", description: "Endereço do escritório atualizado!", variant: "success" });
   };
 
   const handleEdit = (lawyer: LawyerExtended) => {
@@ -94,10 +104,10 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
   };
 
   const handleDelete = async (id: number) => {
-      if (confirm("Remover este advogado?")) {
+      confirmAction("Atenção", "Remover este advogado?", async () => {
           await supabase.from('lawyers').delete().eq('id', id);
           fetchLawyers();
-      }
+      });
   };
 
   const resetForm = () => {
@@ -197,6 +207,14 @@ export function LawyersPage({ onBack }: { onBack: () => void }) {
             </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={isOpen}
+        title={config?.title}
+        message={config?.message}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </div>
   );
 }
