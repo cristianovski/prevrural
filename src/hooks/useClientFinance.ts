@@ -72,16 +72,22 @@ export function useClientFinance(clientId: number) {
         const valorParcela = novaResp.valor_total / numParcelas;
         const dataInicio = new Date(novaResp.data_inicio);
 
+        const installmentsToInsert = [];
         for (let i = 1; i <= numParcelas; i++) {
           const vencimento = new Date(dataInicio);
           vencimento.setMonth(vencimento.getMonth() + i - 1);
-          await supabase.from('financial_installments').insert({
+          installmentsToInsert.push({
             responsibility_id: novaResp.id,
             numero_parcela: i,
             valor_previsto: valorParcela,
             data_vencimento: vencimento.toISOString().split('T')[0],
             status: 'pendente'
           });
+        }
+
+        if (installmentsToInsert.length > 0) {
+          const { error } = await supabase.from('financial_installments').insert(installmentsToInsert);
+          if (error) throw error;
         }
       }
 
